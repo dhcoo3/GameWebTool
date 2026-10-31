@@ -1,0 +1,41 @@
+{
+  "status": "motion reference extracted; equipment redraw blocked by missing editable character",
+  "direction": "E",
+  "originalPngRow": 1,
+  "originalPngRowZeroBased": 0,
+  "source": "/Users/ysj/Documents/Fanstasy/GameTopRouge/Client/GameTopRouge/Assets/SmallScaleInt/TopDown 2D pixel Characters pack 1/Spritesheets/1Knight/Melee.png",
+  "sourceSha256": "95012c4121818c2d114b81ba6409971824373e69889576c315bbb8ab02a934e1",
+  "animation": "/Users/ysj/Documents/Fanstasy/GameTopRouge/Client/GameTopRouge/Assets/SmallScaleInt/TopDown 2D pixel Characters pack 1/Animations/1Knight/Melee/Melee_E.anim",
+  "keyTimesSeconds": [
+    0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.90000004,
+    1,
+    1.1,
+    1.2,
+    1.3000001,
+    1.4
+  ],
+  "clipStopSeconds": 1.4166666,
+  "loop": false,
+  "frameSize": [
+    256,
+    256
+  ],
+  "referenceOnly": true,
+  "referenceScale": 2,
+  "previewFrameMs": 100,
+  "notes": [
+    "Preview is looping at 100ms per frame for inspection; source clip is non-looping and stops at 1.4166666s.",
+    "These PNGs are enlarged original pose references, not redesigned character artwork.",
+    "Original effects are baked over the character; occluded anatomy cannot be recovered exactly.",
+    "Original row order: E,SE,S,SW,W,NW,N,NE."
+  ]
+}

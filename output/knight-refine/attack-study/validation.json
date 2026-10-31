@@ -1,0 +1,69 @@
+{
+  "width": 128,
+  "height": 128,
+  "commonScale": 0.111,
+  "groundReference": [
+    64,
+    101
+  ],
+  "safeInset": 4,
+  "frames": [
+    {
+      "name": "01-guard",
+      "bounds": [
+        41,
+        36,
+        88,
+        103
+      ],
+      "swordTip": [
+        81,
+        48
+      ],
+      "groundY": 101
+    },
+    {
+      "name": "02-windup",
+      "bounds": [
+        39,
+        35,
+        86,
+        103
+      ],
+      "swordTip": [
+        70,
+        36
+      ],
+      "groundY": 101
+    },
+    {
+      "name": "03-slash",
+      "bounds": [
+        34,
+        43,
+        94,
+        105
+      ],
+      "swordTip": [
+        95,
+        87
+      ],
+      "groundY": 101
+    },
+    {
+      "name": "04-recovery",
+      "bounds": [
+        38,
+        42,
+        86,
+        103
+      ],
+      "swordTip": [
+        87,
+        83
+      ],
+      "groundY": 101
+    }
+  ],
+  "limitations": "AI concept keyframes: projected equipment shapes may vary; not production inbetweens or eight-direction validation."
+}

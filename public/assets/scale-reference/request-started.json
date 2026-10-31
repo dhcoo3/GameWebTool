@@ -1,0 +1,12 @@
+{
+  "startedAt": "2026-10-25T14:34:52.397Z",
+  "model": "kling-v3",
+  "request": {
+    "provider": "kling",
+    "width": 1024,
+    "height": 1024,
+    "resolution": "1K",
+    "prompt": "One single full-body standing adventurer sprite for a dark fantasy 2D isometric pixel-art RPG. Three-quarter front view facing southeast (lower right), consistent orthographic game camera. Dark red hood, brown and gray leather armor, short cloak ending ABOVE the boots, two clearly separated sturdy dark boots. Human proportions, readable silhouette, crisp pixel-art clusters, restrained highlights. Neutral idle pose with both feet at the same ground level. Character fills about 80 percent of image height, entirely inside the frame, generous empty space on all sides. Uniform perfectly flat chroma-key green background RGB(0,255,0), with no gradient, no texture. The character must contain NO green colors. This is a standalone CHARACTER sprite, not a map or landscape. No weapon, no ground, no cast shadow, no text, no border, no extra characters, no sprite sheet, no UI.",
+    "negativePrompt": "landscape, map, scenery, terrain, ground plane, pedestal, cast shadow, green clothing, green equipment, multiple characters, cropped head, cropped boots, weapon, text, watermark, sprite sheet, border, background gradient"
+  }
+}

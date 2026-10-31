@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "name": "暗红兜帽冒险者 · 可灵临时比例方案",
+  "characterFile": "character.png",
+  "provider": "kling",
+  "model": "kling-v3",
+  "resolution": "1K",
+  "generatedAt": "2026-10-25T14:35:16.105Z",
+  "scaleReference": {
+    "enabled": true,
+    "visible": true,
+    "heightPx": 96,
+    "footWidthPx": 32,
+    "footDepthPx": 16,
+    "feetX": 0.5,
+    "feetY": 1,
+    "speedPx": 160,
+    "doorHeightPx": 120,
+    "doorWidthPx": 64,
+    "roadWidthPx": 96,
+    "houseWidthCells": 4,
+    "houseDepthCells": 3,
+    "treeMinHeightPx": 192,
+    "treeMaxHeightPx": 384,
+    "bounds": {
+      "x": 2,
+      "y": 2,
+      "width": 36,
+      "height": 96,
+      "sourceWidth": 40,
+      "sourceHeight": 100
+    }
+  }
+}

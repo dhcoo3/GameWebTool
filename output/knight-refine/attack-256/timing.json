@@ -1,0 +1,45 @@
+{
+  "columns": [
+    "front-right",
+    "front",
+    "front-left",
+    "left",
+    "back-left",
+    "back",
+    "back-right",
+    "right"
+  ],
+  "rows": [
+    "guard",
+    "windup-start",
+    "windup-full",
+    "slash-mid",
+    "slash-extended",
+    "retract",
+    "settle",
+    "guard-return"
+  ],
+  "delaysMs": [
+    100,
+    100,
+    100,
+    50,
+    50,
+    100,
+    100,
+    100
+  ],
+  "ground": {
+    "x": 128,
+    "y": 202
+  },
+  "cell": {
+    "width": 256,
+    "height": 256
+  },
+  "atlas": {
+    "width": 2048,
+    "height": 2048
+  },
+  "uv": "x=(directionIndex)*256; y=(frameIndex)*256; zero-based indices"
+}

@@ -1,0 +1,82 @@
+{
+  "frameSize": [
+    128,
+    128
+  ],
+  "safeInset": 4,
+  "previewDelaysMs": [
+    500,
+    240,
+    100,
+    300
+  ],
+  "frames": [
+    {
+      "name": "01-guard",
+      "fxBounds": null,
+      "combinedBounds": [
+        41,
+        36,
+        88,
+        103
+      ],
+      "fxPixels": 0,
+      "unwantedBodyOverlaps": 0,
+      "sourceSha256": "02139a5a36956a47ebc362f36781bc7772a9e23ebeb7273548815a0cc640a7b2"
+    },
+    {
+      "name": "02-windup",
+      "fxBounds": [
+        58,
+        36,
+        68,
+        40
+      ],
+      "combinedBounds": [
+        39,
+        35,
+        86,
+        103
+      ],
+      "fxPixels": 11,
+      "unwantedBodyOverlaps": 0,
+      "sourceSha256": "605e81e781d99d0fe8ba9e0f89d8977a4e5233701e212300c0c2062d920d8169"
+    },
+    {
+      "name": "03-slash",
+      "fxBounds": [
+        81,
+        34,
+        102,
+        86
+      ],
+      "combinedBounds": [
+        34,
+        34,
+        102,
+        105
+      ],
+      "fxPixels": 217,
+      "unwantedBodyOverlaps": 0,
+      "sourceSha256": "ef5a417775de3edc8f4e58e8a7d43388ef8d3a3303c66e4837fddefa8e0b9528"
+    },
+    {
+      "name": "04-recovery",
+      "fxBounds": [
+        83,
+        70,
+        93,
+        84
+      ],
+      "combinedBounds": [
+        38,
+        42,
+        93,
+        103
+      ],
+      "fxPixels": 39,
+      "unwantedBodyOverlaps": 0,
+      "sourceSha256": "48ff91c821f5ffade955cea512dcb24b8b106619318bf604ae580ffd61f322fe"
+    }
+  ]
+}

@@ -1,0 +1,1826 @@
+{
+  "method": "manual 2D projected landmark annotation; not recovered original rig",
+  "direction": "E",
+  "source": "/Users/ysj/Documents/Fanstasy/GameTopRouge/Client/GameTopRouge/Assets/SmallScaleInt/TopDown 2D pixel Characters pack 1/Spritesheets/1Knight/Melee.png",
+  "sourceFrame": [
+    128,
+    128
+  ],
+  "outputFrame": [
+    256,
+    256
+  ],
+  "coordinateOrigin": "top-left",
+  "colors": {
+    "body": "#35ff69",
+    "weapons": "#ff3c48"
+  },
+  "green": "human joint chain",
+  "red": "sword grip-to-tip and shield long axis",
+  "dashed": "occluded or uncertain projected positions",
+  "nominalPreviewMs": 100,
+  "sourceClipStopSeconds": 1.4166666,
+  "sourceLoop": false,
+  "frames": [
+    {
+      "index": 1,
+      "timeSeconds": 0,
+      "joints": {
+        "head": {
+          "x": 138,
+          "y": 104,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 134,
+          "y": 116,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 130,
+          "y": 126,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 130,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 114,
+          "y": 120,
+          "confidence": "visible-or-approximated"
+        },
+        "near_elbow": {
+          "x": 106,
+          "y": 134,
+          "confidence": "visible-or-approximated"
+        },
+        "near_wrist": {
+          "x": 114,
+          "y": 148,
+          "confidence": "visible-or-approximated"
+        },
+        "far_shoulder": {
+          "x": 150,
+          "y": 112,
+          "confidence": "visible-or-approximated"
+        },
+        "far_elbow": {
+          "x": 156,
+          "y": 120,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 160,
+          "y": 130,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 122,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 112,
+          "y": 166,
+          "confidence": "visible-or-approximated"
+        },
+        "near_ankle": {
+          "x": 94,
+          "y": 182,
+          "confidence": "visible-or-approximated"
+        },
+        "near_toe": {
+          "x": 96,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 138,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 156,
+          "y": 150,
+          "confidence": "visible-or-approximated"
+        },
+        "far_ankle": {
+          "x": 158,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        },
+        "far_toe": {
+          "x": 166,
+          "y": 174,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          114,
+          148
+        ],
+        "tip": [
+          132,
+          130
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            160,
+            96
+          ],
+          [
+            164,
+            138
+          ]
+        ],
+        "confidence": "approximated"
+      }
+    },
+    {
+      "index": 2,
+      "timeSeconds": 0.1,
+      "joints": {
+        "head": {
+          "x": 134,
+          "y": 104,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 132,
+          "y": 116,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 130,
+          "y": 126,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 132,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 114,
+          "y": 120,
+          "confidence": "visible-or-approximated"
+        },
+        "near_elbow": {
+          "x": 108,
+          "y": 134,
+          "confidence": "visible-or-approximated"
+        },
+        "near_wrist": {
+          "x": 116,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "far_shoulder": {
+          "x": 150,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "far_elbow": {
+          "x": 156,
+          "y": 114,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 160,
+          "y": 118,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 124,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 110,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        },
+        "near_ankle": {
+          "x": 94,
+          "y": 182,
+          "confidence": "visible-or-approximated"
+        },
+        "near_toe": {
+          "x": 96,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 140,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 158,
+          "y": 148,
+          "confidence": "visible-or-approximated"
+        },
+        "far_ankle": {
+          "x": 160,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        },
+        "far_toe": {
+          "x": 168,
+          "y": 172,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          116,
+          144
+        ],
+        "tip": [
+          136,
+          124
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            160,
+            98
+          ],
+          [
+            178,
+            122
+          ]
+        ],
+        "confidence": "approximated"
+      }
+    },
+    {
+      "index": 3,
+      "timeSeconds": 0.2,
+      "joints": {
+        "head": {
+          "x": 136,
+          "y": 104,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 134,
+          "y": 116,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 132,
+          "y": 126,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 134,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 116,
+          "y": 120,
+          "confidence": "visible-or-approximated"
+        },
+        "near_elbow": {
+          "x": 108,
+          "y": 130,
+          "confidence": "visible-or-approximated"
+        },
+        "near_wrist": {
+          "x": 116,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "far_shoulder": {
+          "x": 152,
+          "y": 108,
+          "confidence": "visible-or-approximated"
+        },
+        "far_elbow": {
+          "x": 162,
+          "y": 108,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 168,
+          "y": 112,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 126,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 110,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        },
+        "near_ankle": {
+          "x": 94,
+          "y": 182,
+          "confidence": "visible-or-approximated"
+        },
+        "near_toe": {
+          "x": 96,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 142,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 160,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "far_ankle": {
+          "x": 168,
+          "y": 164,
+          "confidence": "visible-or-approximated"
+        },
+        "far_toe": {
+          "x": 176,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          116,
+          140
+        ],
+        "tip": [
+          144,
+          116
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            162,
+            102
+          ],
+          [
+            188,
+            116
+          ]
+        ],
+        "confidence": "approximated"
+      }
+    },
+    {
+      "index": 4,
+      "timeSeconds": 0.3,
+      "joints": {
+        "head": {
+          "x": 142,
+          "y": 108,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 138,
+          "y": 118,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 138,
+          "y": 128,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 138,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 120,
+          "y": 122,
+          "confidence": "visible-or-approximated"
+        },
+        "near_elbow": {
+          "x": 110,
+          "y": 120,
+          "confidence": "visible-or-approximated"
+        },
+        "near_wrist": {
+          "x": 108,
+          "y": 116,
+          "confidence": "visible-or-approximated"
+        },
+        "far_shoulder": {
+          "x": 158,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "far_elbow": {
+          "x": 170,
+          "y": 108,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 178,
+          "y": 110,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 130,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 112,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        },
+        "near_ankle": {
+          "x": 96,
+          "y": 182,
+          "confidence": "visible-or-approximated"
+        },
+        "near_toe": {
+          "x": 98,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 146,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 166,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "far_ankle": {
+          "x": 176,
+          "y": 160,
+          "confidence": "visible-or-approximated"
+        },
+        "far_toe": {
+          "x": 184,
+          "y": 162,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          108,
+          116
+        ],
+        "tip": [
+          146,
+          66
+        ],
+        "confidence": "approximated-visible"
+      },
+      "shield": {
+        "axis": [
+          [
+            170,
+            104
+          ],
+          [
+            196,
+            110
+          ]
+        ],
+        "confidence": "approximated"
+      }
+    },
+    {
+      "index": 5,
+      "timeSeconds": 0.4,
+      "joints": {
+        "head": {
+          "x": 148,
+          "y": 108,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 146,
+          "y": 120,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 144,
+          "y": 128,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 146,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 130,
+          "y": 120,
+          "confidence": "visible-or-approximated"
+        },
+        "near_elbow": {
+          "x": 120,
+          "y": 128,
+          "confidence": "visible-or-approximated"
+        },
+        "near_wrist": {
+          "x": 114,
+          "y": 122,
+          "confidence": "visible-or-approximated"
+        },
+        "far_shoulder": {
+          "x": 162,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "far_elbow": {
+          "x": 172,
+          "y": 106,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 178,
+          "y": 104,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 138,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 128,
+          "y": 164,
+          "confidence": "visible-or-approximated"
+        },
+        "near_ankle": {
+          "x": 110,
+          "y": 180,
+          "confidence": "visible-or-approximated"
+        },
+        "near_toe": {
+          "x": 112,
+          "y": 188,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 154,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 172,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "far_ankle": {
+          "x": 188,
+          "y": 154,
+          "confidence": "visible-or-approximated"
+        },
+        "far_toe": {
+          "x": 196,
+          "y": 158,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          114,
+          122
+        ],
+        "tip": [
+          112,
+          84
+        ],
+        "confidence": "approximated-visible"
+      },
+      "shield": {
+        "axis": [
+          [
+            164,
+            92
+          ],
+          [
+            196,
+            104
+          ]
+        ],
+        "confidence": "approximated"
+      }
+    },
+    {
+      "index": 6,
+      "timeSeconds": 0.5,
+      "joints": {
+        "head": {
+          "x": 164,
+          "y": 102,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 160,
+          "y": 114,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 158,
+          "y": 126,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 156,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 152,
+          "y": 116,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 146,
+          "y": 130,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 140,
+          "y": 152,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 174,
+          "y": 110,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 178,
+          "y": 102,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 174,
+          "y": 94,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 148,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 134,
+          "y": 164,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 108,
+          "y": 182,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 104,
+          "y": 188,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 164,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 178,
+          "y": 144,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 174,
+          "y": 164,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 184,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          140,
+          152
+        ],
+        "tip": [
+          160,
+          208
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            158,
+            86
+          ],
+          [
+            188,
+            96
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 7,
+      "timeSeconds": 0.6,
+      "joints": {
+        "head": {
+          "x": 178,
+          "y": 98,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 172,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 170,
+          "y": 122,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 166,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 162,
+          "y": 110,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 172,
+          "y": 122,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 192,
+          "y": 120,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 184,
+          "y": 108,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 174,
+          "y": 102,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 164,
+          "y": 98,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 158,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 140,
+          "y": 166,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 112,
+          "y": 182,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 110,
+          "y": 188,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 174,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 188,
+          "y": 148,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 184,
+          "y": 170,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 192,
+          "y": 174,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          192,
+          120
+        ],
+        "tip": [
+          218,
+          130
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            156,
+            96
+          ],
+          [
+            128,
+            122
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 8,
+      "timeSeconds": 0.7,
+      "joints": {
+        "head": {
+          "x": 182,
+          "y": 98,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 176,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 172,
+          "y": 122,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 168,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 164,
+          "y": 110,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 158,
+          "y": 120,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 172,
+          "y": 138,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 188,
+          "y": 112,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 198,
+          "y": 126,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 196,
+          "y": 142,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 160,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 138,
+          "y": 168,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 112,
+          "y": 184,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 110,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 176,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 190,
+          "y": 152,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 186,
+          "y": 174,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 194,
+          "y": 178,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          172,
+          138
+        ],
+        "tip": [
+          222,
+          166
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            158,
+            98
+          ],
+          [
+            124,
+            136
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 9,
+      "timeSeconds": 0.8,
+      "joints": {
+        "head": {
+          "x": 182,
+          "y": 98,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 178,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 174,
+          "y": 122,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 170,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 164,
+          "y": 110,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 156,
+          "y": 122,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 174,
+          "y": 138,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 190,
+          "y": 112,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 198,
+          "y": 128,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 196,
+          "y": 146,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 162,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 138,
+          "y": 168,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 112,
+          "y": 184,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 110,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 178,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 192,
+          "y": 154,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 188,
+          "y": 176,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 196,
+          "y": 180,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          174,
+          138
+        ],
+        "tip": [
+          224,
+          174
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            156,
+            98
+          ],
+          [
+            122,
+            136
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 10,
+      "timeSeconds": 0.9,
+      "joints": {
+        "head": {
+          "x": 180,
+          "y": 98,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 176,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 172,
+          "y": 122,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 168,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 162,
+          "y": 110,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 154,
+          "y": 124,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 176,
+          "y": 140,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 188,
+          "y": 112,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 196,
+          "y": 128,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 194,
+          "y": 146,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 160,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 138,
+          "y": 168,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 112,
+          "y": 184,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 110,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 176,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 190,
+          "y": 154,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 186,
+          "y": 176,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 194,
+          "y": 180,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          176,
+          140
+        ],
+        "tip": [
+          218,
+          172
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            158,
+            98
+          ],
+          [
+            130,
+            138
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 11,
+      "timeSeconds": 1,
+      "joints": {
+        "head": {
+          "x": 176,
+          "y": 98,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 172,
+          "y": 110,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 168,
+          "y": 122,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 164,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 158,
+          "y": 110,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 152,
+          "y": 126,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 176,
+          "y": 140,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 184,
+          "y": 112,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 192,
+          "y": 126,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 192,
+          "y": 142,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 156,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 136,
+          "y": 168,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 112,
+          "y": 184,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 110,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 172,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 188,
+          "y": 152,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 184,
+          "y": 174,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 192,
+          "y": 178,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          176,
+          140
+        ],
+        "tip": [
+          212,
+          156
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            166,
+            96
+          ],
+          [
+            144,
+            136
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 12,
+      "timeSeconds": 1.1,
+      "joints": {
+        "head": {
+          "x": 172,
+          "y": 100,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 168,
+          "y": 112,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 164,
+          "y": 124,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 160,
+          "y": 140,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 154,
+          "y": 112,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 148,
+          "y": 128,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 172,
+          "y": 142,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 180,
+          "y": 114,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 188,
+          "y": 126,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 188,
+          "y": 140,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 152,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 134,
+          "y": 168,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 112,
+          "y": 184,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 110,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 168,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 184,
+          "y": 150,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 180,
+          "y": 172,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 188,
+          "y": 176,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          172,
+          142
+        ],
+        "tip": [
+          202,
+          130
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            178,
+            96
+          ],
+          [
+            188,
+            136
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 13,
+      "timeSeconds": 1.2,
+      "joints": {
+        "head": {
+          "x": 162,
+          "y": 102,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 158,
+          "y": 114,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 154,
+          "y": 126,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 152,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 144,
+          "y": 114,
+          "confidence": "estimated"
+        },
+        "near_elbow": {
+          "x": 140,
+          "y": 130,
+          "confidence": "estimated"
+        },
+        "near_wrist": {
+          "x": 162,
+          "y": 146,
+          "confidence": "estimated"
+        },
+        "far_shoulder": {
+          "x": 170,
+          "y": 114,
+          "confidence": "estimated"
+        },
+        "far_elbow": {
+          "x": 180,
+          "y": 124,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 182,
+          "y": 138,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 144,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 128,
+          "y": 168,
+          "confidence": "estimated"
+        },
+        "near_ankle": {
+          "x": 106,
+          "y": 184,
+          "confidence": "estimated"
+        },
+        "near_toe": {
+          "x": 106,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 160,
+          "y": 142,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 174,
+          "y": 150,
+          "confidence": "estimated"
+        },
+        "far_ankle": {
+          "x": 168,
+          "y": 172,
+          "confidence": "estimated"
+        },
+        "far_toe": {
+          "x": 176,
+          "y": 176,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          162,
+          146
+        ],
+        "tip": [
+          194,
+          116
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            176,
+            100
+          ],
+          [
+            190,
+            138
+          ]
+        ],
+        "confidence": "estimated"
+      }
+    },
+    {
+      "index": 14,
+      "timeSeconds": 1.3,
+      "joints": {
+        "head": {
+          "x": 150,
+          "y": 104,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 146,
+          "y": 116,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 142,
+          "y": 128,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 140,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 132,
+          "y": 118,
+          "confidence": "visible-or-approximated"
+        },
+        "near_elbow": {
+          "x": 128,
+          "y": 134,
+          "confidence": "visible-or-approximated"
+        },
+        "near_wrist": {
+          "x": 144,
+          "y": 150,
+          "confidence": "visible-or-approximated"
+        },
+        "far_shoulder": {
+          "x": 160,
+          "y": 114,
+          "confidence": "visible-or-approximated"
+        },
+        "far_elbow": {
+          "x": 168,
+          "y": 124,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 172,
+          "y": 138,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 132,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 120,
+          "y": 170,
+          "confidence": "visible-or-approximated"
+        },
+        "near_ankle": {
+          "x": 100,
+          "y": 184,
+          "confidence": "visible-or-approximated"
+        },
+        "near_toe": {
+          "x": 100,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 148,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 164,
+          "y": 150,
+          "confidence": "visible-or-approximated"
+        },
+        "far_ankle": {
+          "x": 162,
+          "y": 170,
+          "confidence": "visible-or-approximated"
+        },
+        "far_toe": {
+          "x": 172,
+          "y": 176,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          144,
+          150
+        ],
+        "tip": [
+          176,
+          116
+        ],
+        "confidence": "estimated"
+      },
+      "shield": {
+        "axis": [
+          [
+            170,
+            102
+          ],
+          [
+            180,
+            142
+          ]
+        ],
+        "confidence": "approximated"
+      }
+    },
+    {
+      "index": 15,
+      "timeSeconds": 1.4,
+      "joints": {
+        "head": {
+          "x": 142,
+          "y": 104,
+          "confidence": "visible-or-approximated"
+        },
+        "neck": {
+          "x": 138,
+          "y": 116,
+          "confidence": "visible-or-approximated"
+        },
+        "chest": {
+          "x": 134,
+          "y": 128,
+          "confidence": "visible-or-approximated"
+        },
+        "pelvis": {
+          "x": 132,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "near_shoulder": {
+          "x": 120,
+          "y": 120,
+          "confidence": "visible-or-approximated"
+        },
+        "near_elbow": {
+          "x": 114,
+          "y": 136,
+          "confidence": "visible-or-approximated"
+        },
+        "near_wrist": {
+          "x": 124,
+          "y": 150,
+          "confidence": "visible-or-approximated"
+        },
+        "far_shoulder": {
+          "x": 154,
+          "y": 114,
+          "confidence": "visible-or-approximated"
+        },
+        "far_elbow": {
+          "x": 162,
+          "y": 124,
+          "confidence": "estimated"
+        },
+        "far_wrist": {
+          "x": 166,
+          "y": 136,
+          "confidence": "estimated"
+        },
+        "near_hip": {
+          "x": 124,
+          "y": 146,
+          "confidence": "visible-or-approximated"
+        },
+        "near_knee": {
+          "x": 112,
+          "y": 168,
+          "confidence": "visible-or-approximated"
+        },
+        "near_ankle": {
+          "x": 94,
+          "y": 184,
+          "confidence": "visible-or-approximated"
+        },
+        "near_toe": {
+          "x": 96,
+          "y": 190,
+          "confidence": "visible-or-approximated"
+        },
+        "far_hip": {
+          "x": 140,
+          "y": 144,
+          "confidence": "visible-or-approximated"
+        },
+        "far_knee": {
+          "x": 156,
+          "y": 152,
+          "confidence": "visible-or-approximated"
+        },
+        "far_ankle": {
+          "x": 158,
+          "y": 170,
+          "confidence": "visible-or-approximated"
+        },
+        "far_toe": {
+          "x": 168,
+          "y": 176,
+          "confidence": "visible-or-approximated"
+        }
+      },
+      "sword": {
+        "grip": [
+          124,
+          150
+        ],
+        "tip": [
+          160,
+          118
+        ],
+        "confidence": "approximated-visible"
+      },
+      "shield": {
+        "axis": [
+          [
+            162,
+            102
+          ],
+          [
+            172,
+            142
+          ]
+        ],
+        "confidence": "approximated"
+      }
+    }
+  ]
+}
