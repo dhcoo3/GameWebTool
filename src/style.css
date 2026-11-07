@@ -452,7 +452,7 @@ body:has(.home-shell) { min-width: 0; }
 
 .home-tools-section { display: block; min-width: 0; margin-top: 34px; }
 .home-tools-section .home-section-heading { margin-bottom: 15px; }
-.asset-tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.asset-tool-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .asset-tool-tag { min-width: 0; min-height: 174px; display: flex; flex-direction: column; align-items: stretch; padding: 15px 16px 13px; border: 1px solid #e4eae1; border-radius: 11px; text-align: left; color: #4f6053; background: #fbfcfa; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease; }
 .asset-tool-tag.available { border-color: #d8e3ce; background: linear-gradient(145deg, #ffffff, #f7faf2); cursor: pointer; }
 .asset-tool-tag.available:hover { transform: translateY(-2px); border-color: #adc28e; background: #fff; box-shadow: 0 8px 20px #30432b12; }

@@ -1,12 +1,15 @@
+import { pendingTiles } from './map/pendingTiles.js';
+import { SIMPLE_EXPANSION } from './map/simpleExpansion.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useMapEngine from './map/useMapEngine.js';
-import { assetFor, batchTargets, collisionCellIndex, gridCoordinateLabels, DIRECTIONS, ISO_PROMPT, mapGridCellPolygon, mapGridGeometry, mapWorkspaceBounds, pointInPolygon, polygonBounds, PROVIDERS, REGION_COLORS, REGION_TYPES, tileRect } from './map/core.js';
+import { assetFor, intersection, batchTargets, collisionCellIndex, gridCoordinateLabels, DIRECTIONS, ISO_PROMPT, mapGridCellPolygon, mapGridGeometry, mapWorkspaceBounds, pointInPolygon, polygonBounds, PROVIDERS, REGION_COLORS, REGION_TYPES, tileRect } from './map/core.js';
 import { download, exportLayers, exportPng, exportProject, exportPsd, safeName } from './map/exports.js';
 import { GRID_LAYOUTS, gridCellAtPoint, gridCellPolygon, gridLinesPath, normalizeGrid, traceGridCells } from './gridGeometry.js';
 import { CharacterPreview, ScaleReferencePanel } from './map/ScaleReference.jsx';
 import DirectLayerControls from './map/DirectLayerControls.jsx';
 import { validLayerPair } from './map/layers.js';
 import { geminiResolutions, resolutionLabel } from './map/geminiResolution.js';
+import { gptImageResolutions, gptImageSize } from './map/gptImageSize.js';
 import { assetImage, canvas } from './map/images.js';
 import { createRegionAnalysisImage } from './map/regionAnalysis.js';
 import { emptyPolygonDraft, polygonDraftAction, nearPolygonStart } from './map/regionDrawing.js';
@@ -81,6 +84,8 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
   const [tab, setTab] = useState('generate'), [direction, setDirection] = useState('e'), [view, setView] = useState('composite');
   const [pan, setPan] = useState({ x: 50, y: 40 }), [zoom, setZoom] = useState(.5), [cards, setCards] = useState(true), [previewDraft, setPreviewDraft] = useState(true);
   const [gridCoordinates, setGridCoordinates] = useState(false);
+  const [templatePreview, setTemplatePreview] = useState(null), [templateBusy, setTemplateBusy] = useState(false);
+  useEffect(() => setTemplatePreview(null), [p, direction]);
   const [tool, setTool] = useState('select'), [shape, setShape] = useState('rectangle'), [regionType, setRegionType] = useState('collision');
   const currentTypeRegions = p.regions.filter((r) => r.type === regionType);
   const region = selectedRegion?.type === regionType ? selectedRegion : null;
@@ -99,6 +104,9 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
   const [regionAnalysisProvider, setRegionAnalysisProvider] = useState(p.provider === 'kling' ? 'gemini' : p.provider);
   const [regionAnalysisBusy, setRegionAnalysisBusy] = useState('');
   const [regionAnalysis, setRegionAnalysis] = useState(null);
+  const [stitchDisplay,setStitchDisplay]=useState('processed'),[showStitchPaths,setShowStitchPaths]=useState(false);
+  const [seamPoints, setSeamPoints] = useState([]), [previewBefore, setPreviewBefore] = useState(false);
+  useEffect(() => setPreviewBefore(false), [pending]);
   const [batchWidth, setBatchWidth] = useState(3), [batchHeight, setBatchHeight] = useState(3), [concurrency, setConcurrency] = useState(1);
   const [projects, setProjects] = useState(null), [layerView, setLayerView] = useState('objects'), [layerBg, setLayerBg] = useState('checker');
   const [maskEditing, setMaskEditing] = useState(false), [maskPaintMode, setMaskPaintMode] = useState('add');
@@ -112,11 +120,12 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
   const dir = DIRECTIONS.find((d) => d.id === direction), target = tile ? { x: tile.x + dir.dx, y: tile.y + dir.dy } : null;
   const occupied = target && p.tiles.some((t) => t.x === target.x && t.y === target.y);
   const matchingWork = p.work && target && p.work.target.x === target.x && p.work.target.y === target.y;
+  const expansionTile = pending?.tile?.expansionPolicy === SIMPLE_EXPANSION ? pending.tile : tile?.expansionPolicy === SIMPLE_EXPANSION ? tile : null;
   const batch = useMemo(() => tile ? batchTargets(p, tile, batchWidth, batchHeight) : [], [p.tiles, p.tileWidth, p.tileHeight, tile?.id, batchWidth, batchHeight]);
   const draft = tile?.layerDraft || (tile?.objectsId || tile?.groundId ? tile : null);
   const rawMaskId = tile?.layerDraft?.rawMaskId || tile?.rawMaskId || '';
-  const resolutions = p.provider === 'gemini' ? geminiResolutions(config.models?.gemini || '') : config.mapCapabilities?.[p.provider]?.resolutions || ({ openai: ['native'], qwen: ['native', '1K', '2K'], kling: ['native', '1K', '2K'] })[p.provider];
-  const previewProject = useMemo(() => pending ? { ...p, tiles: pending.mode === 'replace' ? p.tiles.map((t) => t.id === pending.tile.id ? pending.tile : t) : [...p.tiles, pending.tile] } : p, [p, pending]);
+  const resolutions = p.provider === 'gemini' ? geminiResolutions(config.models?.gemini || '') : p.provider === 'apiyi' ? gptImageResolutions(config.models?.apiyi || '') : config.mapCapabilities?.[p.provider]?.resolutions || ({ openai: ['native'], qwen: ['native', '1K', '2K'], kling: ['native', '1K', '2K'] })[p.provider];
+  const previewProject = useMemo(() => previewBefore ? { ...p, tiles: pending?.repairSourceTiles || p.tiles } : { ...p, tiles: pendingTiles(p,pending,stitchDisplay) }, [p,pending,previewBefore,stitchDisplay]);
   const grid = useMemo(() => normalizeGrid(p.grid), [p.grid]);
   const gridGeometry = useMemo(() => mapGridGeometry(p), [p.grid, p.tiles, p.tileWidth, p.tileHeight, p.overlapX, p.overlapY]);
   const gridMetrics = gridGeometry.metrics;
@@ -132,8 +141,8 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
   const updateGrid = (change) => engine.patch({ grid: normalizeGrid({ ...engine.ref.current.grid, ...change }) });
   const analyzeRegions = async (kind) => {
     if (locked || !p.tiles.length || regionAnalysisBusy) return;
-    if (!['openai', 'gemini', 'qwen'].includes(regionAnalysisProvider) || !config.configured[regionAnalysisProvider]) {
-      setRegionAnalysis({ kind, sourceKey: regionAnalysisSourceKey, error: `请先在服务设置中配置${({ openai: 'OpenAI', gemini: 'Gemini', qwen: '千问' })[regionAnalysisProvider] || '所选'}提示词服务的 API key。` });
+    if (!['openai', 'apiyi', 'gemini', 'qwen'].includes(regionAnalysisProvider) || !config.configured[regionAnalysisProvider]) {
+      setRegionAnalysis({ kind, sourceKey: regionAnalysisSourceKey, error: `请先在服务设置中配置${({ openai: 'OpenAI', apiyi: 'API易', gemini: 'Gemini', qwen: '千问' })[regionAnalysisProvider] || '所选'}提示词服务的 API key。` });
       return;
     }
     if (kind === 'occlusion' && p.tiles.some((item) => !item.objectsId)) {
@@ -242,7 +251,7 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
       if (event.code === 'Space') { event.preventDefault(); space.current = true; }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redoAction() : undoAction(); return; }
       if (event.key === 'Enter' && localPolygon) { event.preventDefault(); finishPolygon(); }
-      if (event.key === 'Escape') { if (gesture.current?.kind === 'collision') finishCollisionStroke(); else cancelDrawing(); setRetouchPoints([]); return; }
+      if (event.key === 'Escape') { if (gesture.current?.kind === 'collision') finishCollisionStroke(); else cancelDrawing(); setRetouchPoints([]); setSeamPoints([]); if (tool === 'seam') setTool('select'); return; }
       if ((event.key === 'Backspace' || event.key === 'Delete') && localPolygon && polygonDraftRef.current.active) { event.preventDefault(); if (event.key === 'Backspace' && !locked) editPolygon('undo'); return; }
       if ((event.key === 'Delete' || event.key === 'Backspace') && region) { event.preventDefault(); engine.deleteRegion(); }
     };
@@ -302,7 +311,7 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
-    if (tool === 'draw' || tool === 'retouch') { gesture.current = { kind: tool, start: point }; setDrawPoints([point]); return; }
+    if (tool === 'draw' || tool === 'retouch' || tool === 'seam') { gesture.current = { kind: tool, start: point }; setDrawPoints([point]); return; }
     const hitRegion = [...p.regions].reverse().find((r) => r.type === regionType && r.type !== 'collision' && r.visible !== false && r.points?.length >= 3 && pointInPolygon(point, r.points));
     if (hitRegion && tab === 'regions') { engine.setSelectedRegionId(hitRegion.id); gesture.current = { kind: 'region', start: point, region: hitRegion }; return; }
     const hitTile = p.tiles.find((t) => { const r = tileRect(p, t); return point.x >= r.x && point.y >= r.y && point.x < r.x + r.width && point.y < r.y + r.height; });
@@ -323,7 +332,7 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
     }
     if (g.kind === 'collision') { paintCollisionSegment(g, g.last, point); g.last = point; return; }
     if (g.kind === 'region') { const dx = point.x - g.start.x, dy = point.y - g.start.y; setMovedRegion({ ...g.region, points: g.region.points.map((p) => ({ x: p.x + dx, y: p.y + dy })), baseline: g.region.baseline + dy }); }
-    else if (shape === 'free' && g.kind !== 'retouch') setDrawPoints((pts) => pts.length < 600 && Math.hypot(point.x - pts[pts.length - 1].x, point.y - pts[pts.length - 1].y) > 3 / zoom ? [...pts, point] : pts);
+    else if (shape === 'free' && !['retouch', 'seam'].includes(g.kind)) setDrawPoints((pts) => pts.length < 600 && Math.hypot(point.x - pts[pts.length - 1].x, point.y - pts[pts.length - 1].y) > 3 / zoom ? [...pts, point] : pts);
     else setDrawPoints([g.start, { x: point.x, y: g.start.y }, point, { x: g.start.x, y: point.y }]);
   };
   const pointerUp = () => {
@@ -332,8 +341,9 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
     if (g.kind === 'mask') { finishMaskStroke(); return; }
     if (g.kind === 'region') { if (movedRegion) engine.updateRegion(g.region.id, { points: movedRegion.points, baseline: movedRegion.baseline }); setMovedRegion(null); return; }
     const points = state.current.drawPoints;
-    if (g.kind === 'retouch' && (points.length < 3 || polygonBounds(points).width * polygonBounds(points).height < 8)) { setDrawPoints([]); return; }
-    if (g.kind === 'retouch') { setRetouchPoints(points); setDrawPoints([]); setTab('generate'); }
+    if (['retouch', 'seam'].includes(g.kind) && (points.length < 3 || polygonBounds(points).width * polygonBounds(points).height < 8)) { setDrawPoints([]); return; }
+    if (g.kind === 'seam') { setSeamPoints(points); setDrawPoints([]); setTab('generate'); setTool('select'); }
+    else if (g.kind === 'retouch') { setRetouchPoints(points); setDrawPoints([]); setTab('generate'); }
     else { const saved = engine.addRegion(regionType, points); if (saved) { setDrawPoints([]); setTab('regions'); notify(`已保存「${saved.name}」，可继续绘制下一块。`); } }
   };
   useEffect(() => {
@@ -380,10 +390,10 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
           <div className="mx-section-label">拼接设置</div>
           <Field label={`左右重叠 ${p.overlapX}%`}><input type="range" min="0" max="40" value={p.overlapX} onChange={(e) => engine.changeOverlap(+e.target.value, p.overlapY)}/></Field>
           <Field label={`上下重叠 ${p.overlapY}%`}><input type="range" min="0" max="40" value={p.overlapY} onChange={(e) => engine.changeOverlap(p.overlapX, +e.target.value)}/></Field>
-          <Field label="生成细分"><select value={p.subdivisions} onChange={(e) => engine.patch({ subdivisions: +e.target.value })}><option value="1">整块 · 1 次生成</option><option value="2">2 × 2 · 4 次生成</option><option value="3">3 × 3 · 9 次生成</option></select></Field>
           <div className="mx-divider"/>
           <Field label="图像服务"><select value={p.provider} onChange={(e) => engine.patch({ provider: e.target.value, resolution: 'native' })}>{Object.entries(PROVIDERS).map(([key, label]) => <option key={key} value={key}>{label}{config.configured[key] ? ' · 已配置' : ' · 未配置'}</option>)}</select></Field>
-          <Field label="服务输出尺寸"><select value={p.resolution} onChange={(e) => engine.patch({ resolution: e.target.value })}>{!resolutions.includes(p.resolution) && <option value={p.resolution} disabled>{resolutionLabel(p.resolution)} · 当前模型不支持</option>}{resolutions.map((r) => <option key={r} value={r}>{resolutionLabel(r)}</option>)}</select></Field>
+          <Field label="服务输出尺寸"><select value={p.resolution} onChange={(e) => engine.patch({ resolution: e.target.value })}>{!resolutions.includes(p.resolution) && <option value={p.resolution} disabled>{resolutionLabel(p.resolution)} · 当前模型不支持</option>}{resolutions.map((r) => <option key={r} value={r}>{resolutionLabel(r)}{p.provider === 'apiyi' && r === '4K' ? ' · 实验性' : ''}</option>)}</select></Field>
+          {p.provider === 'apiyi' && p.resolution !== 'native' && resolutions.includes(p.resolution) && <p className="mx-hint">{(() => { try { const size = gptImageSize(p.tileWidth, p.tileHeight, p.resolution); return `整块预计 ${size.width} × ${size.height} px；分段生成按各分段画幅计算。较大尺寸可能增加费用与等待时间。`; } catch (e) { return e.message; } })()}</p>}
           {!resolutions.includes(p.resolution) && <p className="mx-hint">当前模型不支持已保存的输出尺寸，请重新选择。</p>}
         </fieldset>
         <button className="mx-service-settings" onClick={onOpenSettings}>⚙ 服务设置 <span>{config.models[p.provider]}</span></button>
@@ -430,7 +440,8 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
               {tab === 'regions' && currentRegionAnalysis?.kind === 'collision' && currentRegionAnalysis.cells.map((cell) => <polygon key={`suggested-collision-${cell.x},${cell.y}`} className="mx-collision-suggestion" points={mapGridCellPolygon(p, cell.x, cell.y).map((v) => `${v.x},${v.y}`).join(' ')}/>)}
               {tab === 'regions' && currentRegionAnalysis?.kind === 'occlusion' && currentRegionAnalysis.regions.map((item, index) => { const bounds = polygonBounds(item.points); return <g key={`suggested-occlusion-${index}`} className="mx-occlusion-suggestion"><polygon points={item.points.map((v) => `${v.x},${v.y}`).join(' ')}/><line x1={bounds.x} x2={bounds.x + bounds.width} y1={item.baseline} y2={item.baseline}/><text x={bounds.x} y={bounds.y - 8 / zoom}>{item.name} · {Math.round(item.confidence * 100)}%</text></g>; })}
               {regionList.filter((r) => r.type !== 'collision' && r.visible !== false && r.points?.length >= 3).map((r) => <g key={r.id}><polygon points={r.points.map((v) => `${v.x},${v.y}`).join(' ')} fill={`${REGION_COLORS[r.type]}38`} stroke={REGION_COLORS[r.type]} strokeWidth={r.id === region?.id ? 3 : 1.5} vectorEffect="non-scaling-stroke"/>{r.id === region?.id && ['occlusion', 'top'].includes(r.type) && <line x1={polygonBounds(r.points).x} x2={polygonBounds(r.points).x + polygonBounds(r.points).width} y1={r.baseline} y2={r.baseline} stroke="#e9c53d" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke"/>}</g>)}
-              {[localPolygon ? polygonDraft.points : drawPoints, retouchPoints].filter((points) => points.length).map((points, i) => <polyline key={i} points={points.map((v) => `${v.x},${v.y}`).join(' ')} fill="none" stroke="#839f37" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke"/>)}
+              {showStitchPaths && stitchDisplay==='processed' && pending?.tile?.stitch?.diagnostics.paths.map((path,i)=><polyline key={`stitch-${i}`} points={path.points.map(v=>`${v.x},${v.y}`).join(' ')} fill="none" stroke={pending.tile.stitch.diagnostics.reliable?'#ffbf38':'#d96b57'} strokeWidth="2" vectorEffect="non-scaling-stroke"/>)}
+              {[localPolygon ? polygonDraft.points : drawPoints, retouchPoints, seamPoints].filter((points) => points.length).map((points, i) => <polyline key={i} points={points.map((v) => `${v.x},${v.y}`).join(' ')} fill="none" stroke="#839f37" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke"/>)}
               {localPolygon && polygonDraft.points.length > 0 && <g className="mx-polygon-start">
                 <circle cx={polygonDraft.points[0].x} cy={polygonDraft.points[0].y} r={(closeHint ? 10 : 6) / zoom} fill={closeHint ? '#d5f36b' : '#fff'} stroke="#627d26" strokeWidth="2" vectorEffect="non-scaling-stroke"/>
                 {closeHint && <text x={polygonDraft.points[0].x + 14 / zoom} y={polygonDraft.points[0].y - 12 / zoom} fontSize={12 / zoom} fill="#395a29">点击起点闭合并保存</text>}
@@ -438,9 +449,9 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
             </svg>
             <CharacterPreview ref={characterRef} project={p} assets={assets} zoom={zoom} locked={locked} tool={tool} onCommit={(position) => engine.updateScaleReference({ position })} onWalkingChange={setWalking} notify={notify}/>
           </div>
-          {cards && previewProject.tiles.filter(inView).map((t) => { const r = tileRect(previewProject, t); return <button key={t.id} disabled={locked} className={`mx-tile-card ${t.id === tile?.id ? 'selected' : ''}`} style={{ left: pan.x + (r.x + r.width / 2) * zoom, top: pan.y + r.y * zoom + 12 }} onPointerDown={(e) => e.stopPropagation()} onClick={() => engine.setSelectedId(t.id)}><strong>{t.id === pending?.tile.id ? '待接纳预览' : t.kind === 'base' ? '主图' : `${t.x}, ${t.y}`}</strong><span>{t.groundId ? '地面 / 物件已分层' : '整体图块'} · 点击选择</span></button>; })}
-          {pending && <div className="mx-preview-bar" onPointerDown={(e) => e.stopPropagation()}><div><strong>{pending.mode === 'replace' ? '局部重绘预览' : '新图块预览'}</strong><span>目标 {pending.tile.x}, {pending.tile.y}</span></div><Button disabled={locked} onClick={engine.discard}>丢弃</Button><Button primary disabled={locked} onClick={engine.accept}>✓ 接纳图块</Button></div>}
-          {busy && <div className="mx-busy-bar" onPointerDown={(e) => e.stopPropagation()}><span className="spinner"/><strong>{busy}</strong>{p.work && <span>{p.work.completedParts.length} / {p.subdivisions ** 2} 分段</span>}<Button onClick={engine.cancel}>停止</Button></div>}
+          {cards && previewProject.tiles.filter(inView).map((t) => { const r = tileRect(previewProject, t); return <button key={t.id} disabled={locked} className={`mx-tile-card ${t.id === tile?.id ? 'selected' : ''}`} style={{ left: pan.x + (r.x + r.width / 2) * zoom, top: pan.y + r.y * zoom + 12 }} onPointerDown={(e) => e.stopPropagation()} onClick={() => engine.setSelectedId(t.id)}><strong>{t.id === pending?.tile?.id ? '待接纳预览' : t.kind === 'base' ? '主图' : `${t.x}, ${t.y}`}</strong><span>{t.groundId ? '地面 / 物件已分层' : '整体图块'} · 点击选择</span></button>; })}
+          {pending && <div className="mx-preview-bar" onPointerDown={(e) => e.stopPropagation()}><div><strong>{pending.previewKind === 'seam' ? '跨图块接缝修复预览' : pending.previewKind === 'stitch' ? '本地拼接处理预览' : pending.previewKind === 'regenerate' ? '地图块重生成预览' : pending.mode === 'replace' ? '局部重绘预览' : '新图块预览'}</strong><span>{pending.tiles ? `${pending.tiles.length} 张图块` : `目标 ${pending.tile.x}, ${pending.tile.y}`}</span></div>{pending.previewKind === 'seam' && <Button disabled={locked} onClick={engine.correctSeamColors}>本地校正颜色</Button>}<Button onClick={() => setPreviewBefore((v) => !v)}>{previewBefore ? '查看生成后' : '查看生成前'}</Button><Button disabled={Boolean(busy)||engine.pumpActive} onClick={engine.discard}>丢弃</Button><Button primary disabled={Boolean(busy)||engine.pumpActive} onClick={engine.accept}>{pending.previewKind === 'seam' ? '✓ 接纳修复' : pending.previewKind === 'regenerate' ? '✓ 替换当前图块' : '✓ 接纳图块'}</Button></div>}
+          {busy && <div className="mx-busy-bar" onPointerDown={(e) => e.stopPropagation()}><span className="spinner"/><strong>{busy}</strong>{p.work && <span>{p.work.completedParts.length} / {p.work.expansionPolicy === SIMPLE_EXPANSION ? 1 : p.subdivisions ** 2} 分段</span>}<Button onClick={engine.cancel}>停止</Button></div>}
         </div>
         <footer className="mx-canvas-footer"><span>{maskEditing ? `${maskPaintMode === 'add' ? '白笔添加' : '黑笔擦除'}蒙版 · ${maskBrushSize} px · 左键绘制 · 右键 / 空格拖动画布` : walking ? '试走中 · WASD / 方向键移动 · Esc 停止' : '右键 / 空格拖动 · 滚轮缩放'}{!maskEditing && !walking && tool === 'draw' && shape === 'polygon' ? ' · 点击加点／起点闭合，Enter 保存，Backspace 撤回点，Esc 取消' : ''}</span><span>{grid.visible ? `${GRID_LAYOUTS.find((layout) => layout.id === grid.layout)?.label} · Cell ${grid.cellWidthPx} × ${grid.cellHeightPx} px · ` : ''}{q && ['running', 'pausing', 'paused'].includes(q.status) ? `自动扩图 ${done}/${q.tasks.length} · ${q.status === 'running' ? '生成中' : '已暂停'}` : tab === 'regions' ? regionType === 'collision' ? `${collisionRegion?.cells?.length || 0} 个碰撞格` : `${currentTypeRegions.length} 个${REGION_TYPES[regionType]}` : `${collisionRegion?.cells?.length || 0} 个碰撞格 · ${p.regions.filter((r) => r.type !== 'collision').length} 个区域`}</span></footer>
       </main>
@@ -465,25 +476,66 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
               <Field label="场景描述 / 正向提示词"><textarea rows="7" value={p.prompt} maxLength="8000" onChange={(e) => engine.patch({ prompt: e.target.value })}/></Field>
               <Button onClick={() => engine.patch({ prompt: `${ISO_PROMPT}\n${p.prompt === ISO_PROMPT ? '' : p.prompt}`.trim() })}>＋ 45° 等距视角预设</Button>
               <p className="mx-hint">等距只限定视角；地图生成内容会要求铺满矩形画幅的四边和四角。</p>
+              {p.tiles.length > 0 && <><Field label="扩图内容要求（选填）"><textarea aria-label="扩图内容要求" rows="3" maxLength="8000" value={p.expansionDescription || ''} onChange={(e) => engine.patch({ expansionDescription: e.target.value })} placeholder="留空时使用场景描述；可填写本次扩图要求，例如沿道路延伸树林。"/></Field><p className="mx-hint">留空时使用场景描述；填写后用于扩图。全局规则和已启用的比例设置仍会参与生成。</p>{p.retiredExpansionDescription && <><p className="mx-hint">旧项目有一段未启用的扩图描述，可恢复后编辑。</p><Button onClick={() => engine.patch({ expansionDescription: p.retiredExpansionDescription, retiredExpansionDescription: '' })}>恢复旧扩图描述</Button></>}</>}
+              <p className="mx-hint">自动选缝可能修改已有图块的重叠区域。</p>
+              <Field label="生成细分"><select value={p.subdivisions} onChange={(e) => engine.patch({ subdivisions: +e.target.value })}><option value="1">整块 · 1 次生成</option><option value="2">2 × 2 · 4 次生成</option><option value="3">3 × 3 · 9 次生成</option></select></Field>
+              <label className="mx-check"><input type="checkbox" role="switch" checked={p.expansionContextEnabled === true} onChange={(e) => engine.patch({ expansionContextEnabled: e.target.checked })}/>扩图额外上下文参考</label>
+              <p className="mx-hint">额外上下文图是否用于生成取决于所选服务和模型；可在下方查看提交给本机服务的图片。</p>
               <Field label="反向提示词"><textarea rows="3" value={p.negativePrompt} onChange={(e) => engine.patch({ negativePrompt: e.target.value })}/></Field>
               {p.tiles.length <= 1 && <ReferenceControls project={p} engine={engine} config={config} notify={notify} onUpload={() => styleRef.current.click()}/>}
             </fieldset>
             <ReferenceSummary project={p} operation={p.tiles.length ? 'expand' : 'seed'}/>
+            {p.tiles.length>0 && <><p className="mx-hint">按上下文参考与分段生成，并自动处理拼接。</p><Button disabled={locked || !tile || templateBusy} onClick={async () => { setTemplateBusy(true); try { setTemplatePreview(await engine.previewExpansionTemplate(dir)); } catch (error) { notify(error.message); } finally { setTemplateBusy(false); } }}>{templateBusy ? '正在准备模板…' : '查看扩图模板'}</Button>{templatePreview && <div className="mx-template-preview"><p className="mx-hint">提交给本机服务的参考画面 · {templatePreview.width} × {templatePreview.height} px。{templatePreview.editMask ? '透明遮罩区域为待补范围。' : templatePreview.guideImage ? '编辑标记图另外发送。' : '粉色区域为待补范围。'}</p><img src={templatePreview.image} alt="扩图发送模板预览" style={{width:'100%',background:'#eee',borderRadius:6}}/><a href={templatePreview.image} download="扩图模板.png">下载模板 PNG</a>{templatePreview.editMask && templatePreview.maskImage && <><p className="mx-hint">提交给本机服务的遮罩（透明部分为待补范围）</p><img src={templatePreview.maskImage} alt="扩图发送遮罩" style={{width:'100%',background:'#333',borderRadius:6}}/></>}{templatePreview.guideImage && <><p className="mx-hint">提交给本机服务的编辑标记图</p><img src={templatePreview.guideImage} alt="扩图编辑标记图" style={{width:'100%',background:'#eee',borderRadius:6}}/></>}{templatePreview.contextImage && <><p className="mx-hint">提交给本机服务的额外上下文图</p><img src={templatePreview.contextImage} alt="扩图额外上下文图" style={{width:'100%',background:'#eee',borderRadius:6}}/></>}</div>}</>}
             <Button disabled={locked} onClick={() => setTab('prompts')}>查看最终提示词 / 请求记录</Button>
             <Button primary disabled={locked || (p.tiles.length ? !tile || occupied : !p.prompt.trim())} onClick={() => p.tiles.length ? engine.expand(dir) : engine.seed()}>{occupied ? '目标位置已有图块' : p.tiles.length ? matchingWork && p.work.status === 'paused' ? '继续生成剩余分段' : `生成${dir.label}相邻地图块` : '✦ 生成初始地图'}</Button>
-            {p.tiles.length === 1 && (!tile?.kind || tile.kind === 'base') && <Button disabled={locked || !p.prompt.trim()} onClick={engine.seed} title="沿用当前描述、尺寸和风格参考重新生成主图">重新生成主图</Button>}
+            {occupied && <p className="mx-hint">所选方向已有图块，不能再新增。要替换某块地图，请先选中它，再用下方的重新生成功能。</p>}
+            {p.tiles.length > 0 && <Button disabled={locked || Boolean(pending) || !tile || (p.tiles.length === 1 && !p.prompt.trim())} onClick={engine.regenerateSelectedTile} title="重新生成选中图块；先预览，接纳后才替换原图">{p.work?.replaceId === tile?.id && p.work.status === 'paused' ? '继续重新生成剩余分段' : '重新生成所选地图块'}</Button>}
             <p className="mx-hint">本次最多 {p.tiles.length ? p.subdivisions ** 2 : 1} 次图像请求 · {PROVIDERS[p.provider]}{matchingWork && p.work.completedParts.length ? ` · 已保留 ${p.work.completedParts.length} 个分段` : ''}</p>
+            {expansionTile?.expansionInfo && <p className="mx-hint">新增区域有效像素 {expansionTile.expansionInfo.effectiveWidth} × {expansionTile.expansionInfo.effectiveHeight}。{expansionTile.expansionInfo.upscaled ? '输出不足，对齐时需要放大。' : '输出尺寸足够。'}</p>}
+            {expansionTile && <details><summary>查看本次模板和服务原图</summary><p className="mx-hint">服务可能重绘整幅模板；画布只采用新增区域。</p><AssetImg id={expansionTile.completedParts?.[0]?.templateAssetId} assets={assets} alt="本次发送模板" style={{width:'100%'}}/><AssetImg id={expansionTile.completedParts?.[0]?.rawAssetId} assets={assets} alt="服务原图" style={{width:'100%'}}/></details>}
+            <div><div className="mx-divider"/><h3>局部选缝与颜色过渡</h3><p className="mx-hint">此操作按像素相似度选择交界位置，可能修改已有图块。</p>
+            <Field label="选缝过渡宽度（地图像素）"><input type="number" min="0" max="32" key={`${pending?.tile?.id}-${pending?.tile?.stitch?.feather ?? p.stitchFeather}`} defaultValue={pending?.tile?.stitch?.feather ?? p.stitchFeather ?? 8} disabled={Boolean(busy)||engine.pumpActive} onBlur={e=>{const n=Math.max(0,Math.min(32,Math.round(+e.target.value||0)));e.target.value=n;if(pending?.tile)engine.reprocessExpansion(n);else engine.patch({stitchFeather:n});}}/></Field>
+            <Button disabled={Boolean(busy)||engine.pumpActive||!tile||pending?.previewKind==='seam'} onClick={()=>engine.reprocessExpansion()}>重新处理已有拼接（本地）</Button>
+            {pending?.tile?.stitch && <section className="mx-stitch-status">
+              {!pending.tile.stitch.diagnostics.reliable && <p className="mx-hint" role="status">未通过拼接质量检查：候选路径仍可能切断物件，请先对照原图或框选完整断裂部位修复。</p>}
+              <div className="mx-segment"><button className={stitchDisplay==='raw'?'active':''} onClick={()=>{setPreviewBefore(false);setStitchDisplay('raw');}}>原始结果</button><button className={stitchDisplay==='processed'?'active':''} onClick={()=>{setPreviewBefore(false);setStitchDisplay('processed');}}>处理后</button></div>
+              <label className="mx-check"><input type="checkbox" checked={showStitchPaths} onChange={e=>setShowStitchPaths(e.target.checked)}/>显示候选拼接路径</label>
+              <p className="mx-hint">校色：{pending.tile.stitch.diagnostics.colorMatch.applied?'已匹配曝光与色偏':'未可靠匹配'} · {pending.tile.stitch.diagnostics.alignment.reason}</p>
+              {pending.tile.stitch.diagnostics.warnings.map((w,i)=><p className="mx-hint" key={i}>⚠ {w}</p>)}
+              {pending.tile.stitch.diagnostics.frames.map((f,i)=><p className="mx-hint" key={i}>参考 {f.referenceWidth}×{f.referenceHeight} · 服务输出 {f.actualWidth}×{f.actualHeight} · 新区域有效 {f.effectiveWidth}×{f.effectiveHeight} · {f.upscaled?'对齐需要放大':'有效像素充足'}</p>)}
+              <Button disabled={Boolean(busy)||engine.pumpActive} onClick={()=>engine.reprocessExpansion()}>重新计算本地处理</Button>
+            </section>}
+            <div className="mx-divider"/><h3>跨图块接缝修复</h3>
+            <p className="mx-hint">接纳修复会修改选区内已有原图像素。框选道路、树干等断裂物件及周围地面；每次 1 条图像请求。</p>
+            <Button disabled={locked || pending?.previewKind==='seam' || previewProject.tiles.length < 2} primary={tool === 'seam'} onClick={() => { setTool('seam'); setView('composite'); setStitchDisplay('processed'); setPreviewBefore(false); setShowStitchPaths(false); setPreviewDraft(false); setSeamPoints([]); setRetouchPoints([]); }}>框选跨图块接缝</Button>
+            <Button disabled={locked || pending?.previewKind==='seam' || !seamPoints.length} onClick={() => engine.repairSeams(seamPoints)}>生成接缝修复预览</Button>
+            {(pending || seamPoints.length > 0) && <Button onClick={() => {
+              const points = pending?.selection ? [{ x: pending.selection.x, y: pending.selection.y }, { x: pending.selection.x + pending.selection.width, y: pending.selection.y + pending.selection.height }] : seamPoints.length ? seamPoints : null;
+              let r = points ? polygonBounds(points) : tileRect(p, pending.tile);
+              if (!points && pending?.mode === 'add') {
+                const overlaps = p.tiles.map((t) => intersection(tileRect(p, t), r)).filter(Boolean);
+                if (overlaps.length) {
+                  const edge = overlaps.sort((a, b) => b.width * b.height - a.width * a.height)[0];
+                  const old = p.tiles.find((t) => intersection(tileRect(p, t), edge)); const oldRect = tileRect(p, old);
+                  r = edge.width > edge.height ? { x: edge.x + edge.width / 2, y: r.y < oldRect.y ? oldRect.y : oldRect.y + oldRect.height, width: 1, height: 1 } : { x: r.x < oldRect.x ? oldRect.x : oldRect.x + oldRect.width, y: edge.y + edge.height / 2, width: 1, height: 1 };
+                }
+              }
+              const box = viewport.current.getBoundingClientRect(); setZoom(2); setPan({ x: box.width / 2 - (r.x + r.width / 2) * 2, y: box.height / 2 - (r.y + r.height / 2) * 2 }); setCards(false);
+            }}>200% 放大检查接缝</Button>}
+            {pending?.tiles?.some((t) => t.needsRelayer) && <p className="mx-hint">接纳会备份相关图块的旧分层，需重新分层；碰撞、遮挡标记保留，请复查。可整次撤销。</p>}
+            {tile?.needsRelayer && <p className="mx-hint">此图块接缝已修改，旧分层已备份，请重新分层。</p>}
+            </div>
             <div className="mx-divider"/><h3>局部重绘</h3><p className="mx-hint">框选选中图块内需要修改的区域，再描述修改内容。</p>
             <Button disabled={locked || !tile} primary={tool === 'retouch'} onClick={() => { setTool('retouch'); setRetouchPoints([]); }}>框选重绘区域</Button>
             <Field label="修改要求"><textarea value={retouchPrompt} rows="3" disabled={locked} onChange={(e) => setRetouchPrompt(e.target.value)}/></Field><Button disabled={locked || !retouchPoints.length} onClick={() => engine.retouch(retouchPoints, retouchPrompt)}>生成局部重绘预览</Button>
             <button className="mx-danger-link" disabled={locked || !tile} onClick={engine.deleteTile}>删除选中图块</button>
           </>}
           {tab === 'auto' && <><p className="mx-hint">自动任务固定使用启动时的场景、全局规则与比例设置，沿已有地图衔接，不使用初始参考图。实际分段内容在请求记录中查看。</p><Button onClick={() => setTab('prompts')}>查看自动任务请求记录</Button>
-            <div className="mx-panel-heading"><small>AUTOMATIC OUTPAINTING</small><h2>自动扩展地图</h2><p>围绕选中图块补全矩形范围，完成一块后继续向外延伸。</p></div>
+            <div className="mx-panel-heading"><small>AUTOMATIC OUTPAINTING</small><h2>自动扩展地图</h2><p>围绕选中图块补全矩形范围，完成一块后继续向外延伸。直接相邻的图块顺序生成，避免相互缺少参考。</p></div>
             <fieldset disabled={locked || !tile} className="mx-fieldset"><div className="mx-two"><Field label="目标列数"><input type="number" min="1" max="9" value={batchWidth} onChange={(e) => setBatchWidth(Math.max(1, Math.min(9, +e.target.value || 1)))}/></Field><Field label="目标行数"><input type="number" min="1" max="9" value={batchHeight} onChange={(e) => setBatchHeight(Math.max(1, Math.min(9, +e.target.value || 1)))}/></Field></div><Field label="同时生成"><select value={concurrency} onChange={(e) => setConcurrency(+e.target.value)}><option value="1">1 块 · 顺序生成</option><option value="2">2 块</option><option value="3">3 块</option></select></Field></fieldset>
-            <div className="mx-estimate"><strong>{batch.length}</strong><span>个空位 · 最多 {batch.length * p.subdivisions ** 2} 次图像请求<br/>默认使用当前提示词和图像服务</span></div>
+            <div className="mx-estimate"><strong>{batch.length}</strong><span>个空位 · 最多 {batch.length * p.subdivisions ** 2} 次图像请求<br/>使用当前扩图设置</span></div>
             <Button primary disabled={locked || !batch.length || !tile} onClick={() => engine.startBatch(batchWidth, batchHeight, concurrency)}>开始自动扩图</Button>
-            {q && <div className="mx-queue"><h3>本批任务 <span>{done} / {q.tasks.length}</span></h3><progress max={q.tasks.length} value={done}/><div className="mx-inline">{q.status === 'running' && <Button onClick={engine.pauseBatch}>暂停</Button>}{['paused', 'stopped'].includes(q.status) && <Button primary disabled={engine.pumpActive} onClick={engine.resumeBatch}>继续 / 重试失败</Button>}{['running', 'pausing', 'paused'].includes(q.status) && <Button onClick={engine.stopBatch}>停止</Button>}<Button disabled={engine.pumpActive || Boolean(busy)} onClick={engine.undoBatch}>整批撤销</Button></div><p className="mx-hint">暂停会等待正在生成的任务完成。停止会中断等待；已提交给服务的请求仍可能计费。</p><div className="mx-task-list">{q.tasks.map((t) => <div key={t.id} className={`mx-task ${t.status}`}><b>{t.x}, {t.y}</b><span>{({ waiting: '等待', running: '生成中', done: '完成', failed: '失败' })[t.status]}{t.status !== 'done' && t.completedParts.length ? ` · ${t.completedParts.length} 分段` : ''}</span>{t.error && <small>{t.error}</small>}</div>)}</div></div>}
+            {q && <div className="mx-queue"><h3>本批任务 <span>{done} / {q.tasks.length}</span></h3><progress max={q.tasks.length} value={done}/><div className="mx-inline">{q.status === 'running' && <Button onClick={engine.pauseBatch}>暂停</Button>}{q.retired && <span>旧简化队列已停止，可检查已生成结果；请新建扩图任务。</span>}{!q.retired && ['paused', 'stopped'].includes(q.status) && <Button primary disabled={engine.pumpActive} onClick={engine.resumeBatch}>继续 / 重试失败</Button>}{['running', 'pausing', 'paused'].includes(q.status) && <Button onClick={engine.stopBatch}>停止</Button>}<Button disabled={engine.pumpActive || Boolean(busy)} onClick={engine.undoBatch}>整批撤销</Button></div><p className="mx-hint">暂停会等待正在生成的任务完成。停止会中断等待；已提交给服务的请求仍可能计费。</p><div className="mx-task-list">{q.tasks.map((t) => <div key={t.id} className={`mx-task ${t.status}`}><b>{t.x}, {t.y}</b><span>{({ waiting: '等待', running: '生成中', done: '完成', failed: '失败', review:'待检查' })[t.status]}{t.status !== 'done' && t.completedParts.length ? ` · ${t.completedParts.length} 分段` : ''}</span>{t.error && <small>{t.error}</small>}{t.status==='review'&&<Button disabled={Boolean(busy)||engine.pumpActive} onClick={()=>engine.showQueueReview(t.id)}>查看待检查结果</Button>}</div>)}</div></div>}
           </>}
           {tab === 'layers' && <>
             <div className="mx-panel-heading"><small>GROUND & OBJECTS</small><h2>地图分层</h2><p>按蒙版从原图提取物件，地面层可单独补全；原图始终保留。</p></div>
@@ -509,7 +561,7 @@ export default function MapExpansion({ config, serverOffline, onOpenSettings, on
               <strong>{regionType === 'collision' ? 'AI 自动识别碰撞格' : 'AI 自动识别遮挡区'}</strong>
               <p className="mx-hint">{regionType === 'collision' ? '识别地图中角色无法通过的地面格。结果先在画布预览，确认后才应用。' : '仅分析已接纳的透明物件层；圈出角色经过其后方时应显示在前景的物件部分。'}</p>
               <Field label="视觉识别模型"><select value={regionAnalysisProvider} disabled={locked || Boolean(regionAnalysisBusy)} onChange={(event) => { setRegionAnalysisProvider(event.target.value); setRegionAnalysis(null); }}>
-                {['gemini', 'openai', 'qwen'].map((provider) => <option key={provider} value={provider}>{({ gemini: 'Gemini', openai: 'OpenAI', qwen: '千问' })[provider]} · {config.configured[provider] ? '已配置' : '未配置'}</option>)}
+                {['gemini', 'openai', 'apiyi', 'qwen'].map((provider) => <option key={provider} value={provider}>{({ gemini: 'Gemini', openai: 'OpenAI', apiyi: 'API易', qwen: '千问' })[provider]} · {config.configured[provider] ? '已配置' : '未配置'}</option>)}
               </select></Field>
               <Button primary disabled={locked || Boolean(regionAnalysisBusy) || !p.tiles.length} onClick={() => analyzeRegions(regionType)}>{regionAnalysisBusy === regionType ? '正在分析地图…' : regionType === 'collision' ? 'AI 分析碰撞格 · 1 次调用' : 'AI 分析遮挡区 · 1 次调用'}</Button>
               {regionType === 'occlusion' && <p className="mx-hint">识别前需先在“分层”接纳所有地图块的透明物件层；不会向 AI 发送原始底图或地面图。</p>}

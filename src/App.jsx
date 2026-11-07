@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import SceneGenerationPage from './SceneGeneration.jsx';
 import MapExpansion from './MapExpansion.jsx';
+import UIProduction from './ui/UIProduction.jsx';
 
 const ICON_PATHS = {
   map: <><path d="m3 7 6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13m6-10v13"/></>,
@@ -30,6 +31,7 @@ function Icon({ name, size = 18, strokeWidth = 1.8, className = '' }) {
 function pageForPath(pathname) {
   if (pathname === '/map-expansion' || pathname === '/terrain') return 'terrain';
   if (pathname === '/scene-generation') return 'scene';
+  if (pathname === '/ui-production') return 'ui';
   return 'home';
 }
 
@@ -37,12 +39,12 @@ export default function App() {
   const [page, setPage] = useState(() => pageForPath(window.location.pathname));
   const [toast, setToast] = useState('');
   const [serverOffline, setServerOffline] = useState(false);
-  const [config, setConfig] = useState({ configured: { openai: false, gemini: false, qwen: false, kling: false }, models: { openai: 'gpt-image-2.5-sunburst', gemini: 'gemini-nano-banana-2.1', openaiPrompt: 'gpt-5.4-mini', geminiPrompt: 'gemini-3.8-flash', qwen: 'qwen-image-3.0-pro', qwenPrompt: 'qwen3.8-max', qwenBaseUrl: 'https://dashscope.aliyuncs.com', kling: 'kling-v3', klingBaseUrl: 'https://api-beijing.klingai.com' } });
+  const [config, setConfig] = useState({ configured: { openai: false, apiyi: false, gemini: false, qwen: false, kling: false }, models: { openai: 'gpt-image-2.5-sunburst', apiyi: 'gpt-image-2.6-sunburst', apiyiPrompt: 'gpt-5.4-mini', apiyiBaseUrl: 'https://api.apiyi.com/v1', apiyiImageQuality: 'high', gemini: 'gemini-nano-banana-2.1', openaiPrompt: 'gpt-5.4-mini', geminiPrompt: 'gemini-3.8-flash', qwen: 'qwen-image-3.0-pro', qwenPrompt: 'qwen3.8-max', qwenBaseUrl: 'https://dashscope.aliyuncs.com', kling: 'kling-v3', klingBaseUrl: 'https://api-beijing.klingai.com' } });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsDraft, setSettingsDraft] = useState({ openaiKey: '', geminiKey: '', qwenKey: '', klingKey: '', openaiModel: 'gpt-image-2.5-sunburst', geminiModel: 'gemini-nano-banana-2.1', openaiPromptModel: 'gpt-5.4-mini', geminiPromptModel: 'gemini-3.8-flash', qwenBaseUrl: 'https://dashscope.aliyuncs.com', qwenImageModel: 'qwen-image-3.0-pro', qwenPromptModel: 'qwen3.8-max', klingBaseUrl: 'https://api-beijing.klingai.com', klingModel: 'kling-v3', clearOpenaiKey: false, clearGeminiKey: false, clearQwenKey: false, clearKlingKey: false });
+  const [settingsDraft, setSettingsDraft] = useState({ openaiKey: '', apiyiKey: '', geminiKey: '', qwenKey: '', klingKey: '', openaiModel: 'gpt-image-2.5-sunburst', apiyiBaseUrl: 'https://api.apiyi.com/v1', apiyiImageModel: 'gpt-image-2.6-sunburst', apiyiPromptModel: 'gpt-5.4-mini', apiyiImageQuality: 'high', geminiModel: 'gemini-nano-banana-2.1', openaiPromptModel: 'gpt-5.4-mini', geminiPromptModel: 'gemini-3.8-flash', qwenBaseUrl: 'https://dashscope.aliyuncs.com', qwenImageModel: 'qwen-image-3.0-pro', qwenPromptModel: 'qwen3.8-max', klingBaseUrl: 'https://api-beijing.klingai.com', klingModel: 'kling-v3', clearOpenaiKey: false, clearApiyiKey: false, clearGeminiKey: false, clearQwenKey: false, clearKlingKey: false });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const navigate = useCallback((path, { replace = false } = {}) => {
-    const destination = path === '/terrain' ? '/map-expansion' : ['/map-expansion', '/scene-generation'].includes(path) ? path : '/';
+    const destination = path === '/terrain' ? '/map-expansion' : ['/map-expansion', '/scene-generation', '/ui-production'].includes(path) ? path : '/';
     if (window.location.pathname !== destination) {
       const method = replace ? 'replaceState' : 'pushState';
       window.history[method]({}, '', destination);
@@ -54,7 +56,7 @@ export default function App() {
     const syncPage = () => {
       const pathname = window.location.pathname;
       if (pathname === '/terrain') navigate('/map-expansion', { replace: true });
-      else if (pathname !== '/' && pathname !== '/map-expansion' && pathname !== '/scene-generation') navigate('/', { replace: true });
+      else if (pathname !== '/' && pathname !== '/map-expansion' && pathname !== '/scene-generation' && pathname !== '/ui-production') navigate('/', { replace: true });
       else setPage(pageForPath(pathname));
     };
     window.addEventListener('popstate', syncPage);
@@ -69,7 +71,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.title = page === 'home' ? '生产工厂 · 游戏资产生成' : page === 'scene' ? '场景生成 · 游戏场景制作' : '地图扩张 · 游戏地图制作';
+    document.title = page === 'home' ? '生产工厂 · 游戏资产生成' : page === 'scene' ? '场景生成 · 游戏场景制作' : page === 'ui' ? 'UI 制作 · 游戏界面拆分与 Unity 导出' : '地图扩张 · 游戏地图制作';
   }, [page]);
 
   useEffect(() => {
@@ -77,13 +79,13 @@ export default function App() {
       if (!response.ok) throw new Error('本机服务未启动');
       const value = await response.json();
       setConfig(value);
-      setSettingsDraft((draft) => ({ ...draft, openaiModel: value.models.openai, geminiModel: value.models.gemini, openaiPromptModel: value.models.openaiPrompt || 'gpt-5.4-mini', geminiPromptModel: value.models.geminiPrompt || 'gemini-3.8-flash', qwenBaseUrl: value.models.qwenBaseUrl || 'https://dashscope.aliyuncs.com', qwenImageModel: value.models.qwen || 'qwen-image-3.0-pro', qwenPromptModel: value.models.qwenPrompt || 'qwen3.8-max', klingBaseUrl: value.models.klingBaseUrl || 'https://api-beijing.klingai.com', klingModel: value.models.kling || 'kling-v3' }));
+      setSettingsDraft((draft) => ({ ...draft, openaiModel: value.models.openai, apiyiBaseUrl: value.models.apiyiBaseUrl || 'https://api.apiyi.com/v1', apiyiImageModel: value.models.apiyi || 'gpt-image-2.6-sunburst', apiyiPromptModel: value.models.apiyiPrompt || 'gpt-5.4-mini', apiyiImageQuality: value.models.apiyiImageQuality || 'high', geminiModel: value.models.gemini, openaiPromptModel: value.models.openaiPrompt || 'gpt-5.4-mini', geminiPromptModel: value.models.geminiPrompt || 'gemini-3.8-flash', qwenBaseUrl: value.models.qwenBaseUrl || 'https://dashscope.aliyuncs.com', qwenImageModel: value.models.qwen || 'qwen-image-3.0-pro', qwenPromptModel: value.models.qwenPrompt || 'qwen3.8-max', klingBaseUrl: value.models.klingBaseUrl || 'https://api-beijing.klingai.com', klingModel: value.models.kling || 'kling-v3' }));
       setServerOffline(false);
     }).catch(() => setServerOffline(true));
   }, []);
 
   const openSettings = useCallback(() => {
-    setSettingsDraft((draft) => ({ ...draft, openaiKey: '', geminiKey: '', qwenKey: '', klingKey: '', openaiModel: config.models.openai, geminiModel: config.models.gemini, openaiPromptModel: config.models.openaiPrompt || 'gpt-5.4-mini', geminiPromptModel: config.models.geminiPrompt || 'gemini-3.8-flash', qwenBaseUrl: config.models.qwenBaseUrl || 'https://dashscope.aliyuncs.com', qwenImageModel: config.models.qwen || 'qwen-image-3.0-pro', qwenPromptModel: config.models.qwenPrompt || 'qwen3.8-max', klingBaseUrl: config.models.klingBaseUrl || 'https://api-beijing.klingai.com', klingModel: config.models.kling || 'kling-v3', clearOpenaiKey: false, clearGeminiKey: false, clearQwenKey: false, clearKlingKey: false }));
+    setSettingsDraft((draft) => ({ ...draft, openaiKey: '', apiyiKey: '', geminiKey: '', qwenKey: '', klingKey: '', openaiModel: config.models.openai, apiyiBaseUrl: config.models.apiyiBaseUrl || 'https://api.apiyi.com/v1', apiyiImageModel: config.models.apiyi || 'gpt-image-2.6-sunburst', apiyiPromptModel: config.models.apiyiPrompt || 'gpt-5.4-mini', apiyiImageQuality: config.models.apiyiImageQuality || 'high', geminiModel: config.models.gemini, openaiPromptModel: config.models.openaiPrompt || 'gpt-5.4-mini', geminiPromptModel: config.models.geminiPrompt || 'gemini-3.8-flash', qwenBaseUrl: config.models.qwenBaseUrl || 'https://dashscope.aliyuncs.com', qwenImageModel: config.models.qwen || 'qwen-image-3.0-pro', qwenPromptModel: config.models.qwenPrompt || 'qwen3.8-max', klingBaseUrl: config.models.klingBaseUrl || 'https://api-beijing.klingai.com', klingModel: config.models.kling || 'kling-v3', clearOpenaiKey: false, clearApiyiKey: false, clearGeminiKey: false, clearQwenKey: false, clearKlingKey: false }));
     setSettingsOpen(true);
   }, [config.models]);
 
@@ -99,12 +101,12 @@ export default function App() {
   }, [notify, settingsDraft]);
 
 
-  return <div className={`app-shell ${page === 'home' ? 'home-shell' : 'terrain-shell'} ${page === 'scene' ? 'scene-shell region-shell' : ''}`}>
+  return <div className={`app-shell ${page === 'home' ? 'home-shell' : page === 'ui' ? 'ui-shell' : 'terrain-shell'} ${page === 'scene' ? 'scene-shell region-shell' : ''}`}>
     <header className={`topbar ${page === 'home' ? 'home-topbar' : 'terrain-topbar'} ${page === 'scene' ? 'scene-topbar' : ''}`}>
       <button className="brand-lockup brand-home-link" onClick={() => navigate('/')} aria-label="返回生产工厂首页">
         <div className="brand-mark"><Icon name="map" size={21}/></div><div><div className="brand-name">生产工厂</div><div className="brand-caption">GAME ASSET FACTORY</div></div>
       </button>
-      {page !== 'home' && <><div className="topbar-center"><span className="local-pill"><span className="status-dot"/>本地工作区</span><span className="topbar-separator"/>{page === 'scene' ? '场景生成工作台' : '地图扩张工作台'}</div><div className="topbar-actions"><button className="icon-button settings-trigger" onClick={openSettings} aria-label="服务设置" title="服务设置"><Icon name="settings"/></button></div></>}
+      {page !== 'home' && <><div className="topbar-center"><span className="local-pill"><span className="status-dot"/>本地工作区</span><span className="topbar-separator"/>{page === 'scene' ? '场景生成工作台' : page === 'ui' ? 'UI 制作工作台' : '地图扩张工作台'}</div><div className="topbar-actions"><button className="icon-button settings-trigger" onClick={openSettings} aria-label="服务设置" title="服务设置"><Icon name="settings"/></button></div></>}
     </header>
     {page === 'home' ? <main className="home-page">
         <div className="home-content">
@@ -130,13 +132,14 @@ export default function App() {
           <section className="home-tools-section" id="asset-tools">
               <div className="home-section-heading">
                 <div><span className="panel-eyebrow">GAME ASSET TOOLS</span><h2>生产功能</h2></div>
-                <span className="tool-count">02 / 04 已开放</span>
+                <span className="tool-count">03 / 05 已开放</span>
               </div>
               <div className="asset-tool-grid">
                 {[
                   { name: '地图扩张', description: '延展地图边界，生成并拼接相邻区域。', status: '已开放', icon: 'map', active: true, path: '/map-expansion' },
                   { name: '角色生成', description: '为游戏角色制作概念图与视觉设定。', status: '筹备中', icon: 'spark' },
                   { name: '场景生成', description: '圈选格子区域，填写场景要求并生成对应内容。', status: '已开放', icon: 'image', active: true, path: '/scene-generation' },
+                  { name: 'UI 制作', description: '生成或导入游戏 UI，校对拆分元素并导出 Unity UGUI。', status: '已开放', icon: 'image', active: true, path: '/ui-production' },
                   { name: '道具生成', description: '设计游戏道具、装备与物件素材。', status: '筹备中', icon: 'plus' },
                 ].map((tool, index) => <button key={tool.name} className={`asset-tool-tag ${tool.active ? 'available' : 'coming-soon'}`} disabled={!tool.active} onClick={() => tool.active && navigate(tool.path)}>
                   <span className="asset-tool-tag-top"><span className="asset-tool-index">0{index + 1}</span><span className={`asset-tool-status ${tool.active ? 'status-open' : ''}`}>{tool.status}</span></span>
@@ -145,11 +148,11 @@ export default function App() {
                   {tool.active && <span className="asset-tool-enter">进入功能<Icon name="arrowRight" size={14}/></span>}
                 </button>)}
               </div>
-              <div className="home-local-note"><Icon name="lock" size={14}/><span>项目保存在当前浏览器。仅在生成提示词或图块时，相关描述与所选参考图会发送给已配置的 AI 服务。</span></div>
+              <div className="home-local-note"><Icon name="lock" size={14}/><span>项目保存在当前浏览器。生成或分析 UI 时，相关描述与所选图片会发送给已配置的 AI 服务。</span></div>
           </section>
           <footer className="home-footer"><span>生产工厂 <i/> GAME ASSET FACTORY</span><span>为游戏资产创作而设计</span></footer>
         </div>
-      </main> : page === 'scene' ? <SceneGenerationPage config={config} serverOffline={serverOffline} onOpenSettings={openSettings}/> : <MapExpansion config={config} serverOffline={serverOffline} onOpenSettings={openSettings} onNotify={notify}/>}
+      </main> : page === 'scene' ? <SceneGenerationPage config={config} serverOffline={serverOffline} onOpenSettings={openSettings}/> : page === 'ui' ? <UIProduction config={config} serverOffline={serverOffline} onOpenSettings={openSettings} onNotify={notify}/> : <MapExpansion config={config} serverOffline={serverOffline} onOpenSettings={openSettings} onNotify={notify}/>}
       {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
         <section className="modal-card settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <div className="modal-header"><div className="modal-icon"><Icon name="settings"/></div><div><span className="panel-eyebrow">LOCAL MODEL SETUP</span><h2 id="settings-title">服务设置</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="关闭"><Icon name="close"/></button></div>
@@ -165,6 +168,15 @@ export default function App() {
             <label className="field-label">提示词模型 ID</label><input className="settings-input" value={settingsDraft.openaiPromptModel} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, openaiPromptModel: event.target.value }))}/>
             <label className="field-label">API key</label><input className="settings-input" type="password" autoComplete="new-password" placeholder={config.configured.openai ? '已保存 · 留空保持不变' : '粘贴 OpenAI API key'} value={settingsDraft.openaiKey} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, openaiKey: event.target.value, clearOpenaiKey: false }))}/>
             {config.configured.openai && <button className="clear-key" onClick={() => setSettingsDraft((draft) => ({ ...draft, clearOpenaiKey: !draft.clearOpenaiKey, openaiKey: '' }))}>{settingsDraft.clearOpenaiKey ? '将清除此密钥' : '清除此密钥'}</button>}
+          </div>
+          <div className="settings-provider-block"><div className="settings-provider-title"><span className="provider-logo openai-logo">易</span><div><strong>API易 · GPT Image</strong><small>{config.configured.apiyi ? '密钥已配置' : '尚未配置'}</small></div><span className={`provider-state ${config.configured.apiyi ? 'active' : ''}`}>{config.configured.apiyi ? '已配置' : '未配置'}</span></div>
+            <label className="field-label">Base URL</label><input className="settings-input" placeholder="https://api.apiyi.com/v1" value={settingsDraft.apiyiBaseUrl} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, apiyiBaseUrl: event.target.value }))}/>
+            <small className="settings-help">使用 API易 的 OpenAI 兼容接口；未填写 /v1 时会自动补齐。</small>
+            <label className="field-label">图像生成模型 ID</label><input className="settings-input" value={settingsDraft.apiyiImageModel} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, apiyiImageModel: event.target.value }))}/>
+            <label className="field-label">提示词模型 ID（支持图像输入）</label><input className="settings-input" value={settingsDraft.apiyiPromptModel} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, apiyiPromptModel: event.target.value }))}/>
+            <label className="field-label">图像画质</label><select className="settings-input" value={settingsDraft.apiyiImageQuality} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, apiyiImageQuality: event.target.value }))}>{['low', 'medium', 'high', 'xhigh', 'max'].map((quality) => <option key={quality} value={quality}>{quality}</option>)}</select>
+            <label className="field-label">API key</label><input className="settings-input" type="password" autoComplete="new-password" placeholder={config.configured.apiyi ? '已保存 · 留空保持不变' : '粘贴 API易 API key'} value={settingsDraft.apiyiKey} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, apiyiKey: event.target.value, clearApiyiKey: false }))}/>
+            {config.configured.apiyi && <button className="clear-key" onClick={() => setSettingsDraft((draft) => ({ ...draft, clearApiyiKey: !draft.clearApiyiKey, apiyiKey: '' }))}>{settingsDraft.clearApiyiKey ? '将清除此密钥' : '清除此密钥'}</button>}
           </div>
           <div className="settings-provider-block"><div className="settings-provider-title"><span className="provider-logo qwen-logo">通</span><div><strong>阿里云百炼 · 千问</strong><small>{config.configured.qwen ? '密钥已配置' : '尚未配置'}</small></div><span className={`provider-state ${config.configured.qwen ? 'active' : ''}`}>{config.configured.qwen ? '已配置' : '未配置'}</span></div>
             <label className="field-label">百炼 API 端点（区域 / 工作空间域名）</label><input className="settings-input" placeholder="https://<WorkspaceId>.cn-beijing.maas.aliyuncs.com" value={settingsDraft.qwenBaseUrl} onChange={(event) => setSettingsDraft((draft) => ({ ...draft, qwenBaseUrl: event.target.value }))}/>

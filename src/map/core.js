@@ -5,7 +5,7 @@ import { GEMINI_GROUND_RESOLUTIONS } from './geminiResolution.js';
 
 export const FORMAT = 'game-asset-factory-map';
 export const DRAFT_ID = '__map_draft_v2__';
-export const PROVIDERS = { gemini: 'Google Gemini', openai: 'OpenAI', qwen: '千问', kling: '可灵' };
+export const PROVIDERS = { gemini: 'Google Gemini', openai: 'OpenAI', apiyi: 'API易', qwen: '千问', kling: '可灵' };
 export const DIRECTIONS = [
   ['nw', '西北', -1, -1, '↖'], ['n', '北', 0, -1, '↑'], ['ne', '东北', 1, -1, '↗'],
   ['w', '西', -1, 0, '←'], ['e', '东', 1, 0, '→'],
@@ -23,7 +23,7 @@ export function newProject() {
     tileWidth: 1024, tileHeight: 1024, overlapX: 15, overlapY: 15,
     prompt: ISO_PROMPT, negativePrompt: '文字，水印，边框，网格线，不一致的透视，重复地标，菱形地图外轮廓，悬浮地块，展示底座，黑色留边，四角空白',
     globalPositivePrompt: '', globalNegativePrompt: '',
-    provider: 'gemini', resolution: 'native', groundResolution: 'auto', subdivisions: 1, styleAssetId: '', referenceSettings: normalizeReferenceSettings(), requestLog: null,
+    stitchFeather: 8, expansionPolicy: 'legacy', expansionReferenceVersion: 1, expansionContext: 'standard', expansionContextEnabled: false, expansionDescription: '', expansionStrategy: 8, provider: 'gemini', resolution: 'native', groundResolution: 'auto', subdivisions: 1, styleAssetId: '', referenceSettings: normalizeReferenceSettings(), requestLog: null,
     visibility: { ground: true, objects: true }, pixelsPerUnit: 100, grid: normalizeGrid(), scaleReference: newScaleReference(), queue: null, layerQueue: null, work: null,
   };
 }
@@ -155,7 +155,14 @@ export function batchTargets(p, center, width, height) {
   return list.sort((a, b) => Math.abs(a.x - center.x) + Math.abs(a.y - center.y) - Math.abs(b.x - center.x) - Math.abs(b.y - center.y) || a.y - b.y || a.x - b.x);
 }
 export function readyTasks(p, tasks) {
-  return tasks.filter((task) => task.status === 'waiting' && p.tiles.some((t) => Math.abs(t.x - task.x) <= 1 && Math.abs(t.y - task.y) <= 1));
+  const active = tasks.filter((t) => t.status === 'running');
+  const chosen = [];
+  for (const task of tasks) {
+    if (task.status !== 'waiting' || !p.tiles.some((t) => Math.abs(t.x - task.x) <= 1 && Math.abs(t.y - task.y) <= 1)) continue;
+    if ([...active, ...chosen].some((t) => Math.abs(t.x - task.x) <= 1 && Math.abs(t.y - task.y) <= 1)) continue;
+    chosen.push(task);
+  }
+  return chosen;
 }
 export function splitRect(width, height, divisions) {
   const n = [1, 2, 3].includes(Number(divisions)) ? Number(divisions) : 1;
@@ -168,6 +175,27 @@ export function splitRect(width, height, divisions) {
 }
 export function normalizeProject(saved) {
   const p = { ...newProject(), ...saved, schemaVersion: 2, format: FORMAT };
+  p.expansionPolicy = 'legacy';
+  // Keep unfinished work as project data without resuming a retired strategy.
+  if (p.work?.expansionPolicy === 'spatial-template-v2') {
+    p.retiredExpansionWork = p.work;
+    p.work = null;
+  }
+  const legacyReference = saved.expansionReferenceVersion !== 1 || Boolean(saved.expansionMode);
+  const oldDescription = typeof saved.expansionDescription === 'string' ? saved.expansionDescription.slice(0, 8000) : '';
+  // Descriptions were inactive in context mode; retain them without silently changing old requests.
+  p.expansionDescription = legacyReference && saved.expansionMode !== 'single' ? '' : oldDescription;
+  if (legacyReference && saved.expansionMode !== 'single' && oldDescription) p.retiredExpansionDescription = oldDescription;
+  if (legacyReference && p.work) {
+    p.retiredExpansionWorks = [...(p.retiredExpansionWorks || []), p.work];
+    p.work = null;
+  }
+  delete p.expansionMode;
+  p.expansionReferenceVersion = 1;
+  p.expansionContext = 'standard';
+  p.expansionContextEnabled = saved.expansionContextEnabled === true;
+  p.expansionStrategy = 8;
+  p.stitchFeather = Number.isFinite(Number(saved.stitchFeather ?? 8)) ? Math.max(0,Math.min(32,Math.round(Number(saved.stitchFeather ?? 8)))) : 8;
   p.visibility = { ...newProject().visibility, ...saved.visibility };
   for (const key of ['globalPositivePrompt', 'globalNegativePrompt']) p[key] = typeof saved[key] === 'string' ? saved[key] : '';
   p.referenceSettings = normalizeReferenceSettings(saved.referenceSettings);
@@ -175,7 +203,21 @@ export function normalizeProject(saved) {
   p.scaleReference = normalizeScaleReference(saved.scaleReference);
   p.groundResolution = GEMINI_GROUND_RESOLUTIONS.includes(saved.groundResolution) ? saved.groundResolution : 'auto';
   p.regions = normalizeCollisionRegions(p, saved.regions || []);
-  if (p.queue) p.queue = { ...p.queue, status: p.queue.status === 'running' ? 'paused' : p.queue.status, tasks: p.queue.tasks.map((t) => ({ ...t, status: t.status === 'running' ? 'waiting' : t.status })) };
+  if (p.queue) p.queue = { ...p.queue, status: ['running', 'pausing'].includes(p.queue.status) ? 'paused' : p.queue.status, tasks: p.queue.tasks.map((t) => ({ ...t, status: t.status === 'running' ? 'waiting' : t.status })) };
+  if (legacyReference && p.queue?.settings) {
+    const { expansionMode, ...settings } = p.queue.settings;
+    const wasSingle = (expansionMode ?? saved.expansionMode) === 'single';
+    if (!wasSingle && settings.expansionDescription) {
+      settings.retiredExpansionDescription = settings.expansionDescription;
+      settings.expansionDescription = '';
+    }
+    p.queue = { ...p.queue, settings, ...(wasSingle && !p.queue.retired && p.queue.status !== 'complete' ? {
+      status: p.queue.status === 'stopped' ? 'stopped' : 'paused',
+      tasks: p.queue.tasks.map((t) => ['done', 'review'].includes(t.status) ? t : { ...t, status: 'waiting', previousParts: [...(t.previousParts || []), ...(t.completedParts || [])], completedParts: [], error: '' }),
+    } : {}) };
+  }
+  if (p.queue?.settings?.expansionPolicy === 'spatial-template-v2') p.queue = { ...p.queue, retired: true, status: p.queue.status === 'complete' ? 'complete' : 'stopped' };
+  if (p.queue && !p.queue.retired && p.queue.settings?.expansionStrategy !== 8) p.queue = { ...p.queue, status: p.queue.status === 'complete' ? 'complete' : 'paused', settings: { ...p.queue.settings, expansionContext: p.expansionContext, expansionContextEnabled: p.expansionContextEnabled, expansionStrategy: 8 }, tasks: p.queue.tasks.map((t) => ['done', 'review'].includes(t.status) ? t : { ...t, status: 'waiting', previousParts: [...(t.previousParts || []), ...(t.completedParts || [])], completedParts: [], error: '' }) };
   if (p.layerQueue) p.layerQueue = { ...p.layerQueue, status: p.layerQueue.status === 'running' || p.layerQueue.status === 'pausing' ? 'paused' : p.layerQueue.status,
     tasks: p.layerQueue.tasks.map((t) => ({ ...t, status: t.status === 'running' ? 'waiting' : t.status })) };
   if (p.work?.status === 'running') p.work = { ...p.work, status: 'paused' };

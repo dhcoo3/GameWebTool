@@ -8,7 +8,10 @@
     "server": "node server/index.js",
     "start": "node server/dev.js",
     "build": "vite build",
-    "test": "node --test tests/map-core.test.js tests/map-scale.test.js tests/providers.test.js tests/network.test.js tests/map-ground.test.js tests/gemini-stream.test.js tests/chroma-key.test.js tests/map-matte.test.js tests/map-reference.test.js"
+    "ui:segmentation:setup": "node scripts/ui-segmentation/setup.mjs",
+    "ui:segmentation:pilot": "node scripts/ui-segmentation/pilot.mjs",
+    "test:ui-segmentation": ".local/ui-segmentation/.venv/bin/python -m unittest discover -s scripts/ui-segmentation -p 'test_*.py'",
+    "test": "node --test tests/simple-expansion.test.js tests/gpt-image-size.test.js tests/map-core.test.js tests/seam-colors.test.js tests/stitch-math.test.js tests/map-scale.test.js tests/providers.test.js tests/network.test.js tests/map-ground.test.js tests/gemini-stream.test.js tests/chroma-key.test.js tests/map-matte.test.js tests/map-reference.test.js tests/ui-analysis.test.js tests/ui-manifest.test.js tests/ui-export.test.js tests/ui-segmentation.test.js tests/ui-layers.test.js"
   },
   "dependencies": {
     "ag-psd": "^33.0.0",

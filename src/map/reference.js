@@ -4,7 +4,7 @@ export function normalizeReferenceSettings(value = {}) {
   const crop = c && ['x', 'y', 'width', 'height'].every((k) => Number.isFinite(c[k])) && c.x >= 0 && c.y >= 0 && c.width > 0 && c.height > 0 && c.x + c.width <= 1.000001 && c.y + c.height <= 1.000001 ? { x: c.x, y: c.y, width: c.width, height: c.height } : null;
   return { mode: Object.hasOwn(REFERENCE_MODES, s.mode) ? s.mode : 'style', input: s.input === 'text' ? 'text' : 'image', crop,
     positive: typeof s.positive === 'string' ? s.positive : '', negative: typeof s.negative === 'string' ? s.negative : '',
-    provider: ['gemini', 'openai', 'qwen'].includes(s.provider) ? s.provider : 'gemini',
+    provider: ['gemini', 'openai', 'apiyi', 'qwen'].includes(s.provider) ? s.provider : 'gemini',
     source: s.source && typeof s.source === 'object' ? { sourceAssetId: String(s.source.sourceAssetId || ''), crop: s.source.crop || null, model: String(s.source.model || '') } : null };
 }
 export function effectiveReference(project) {

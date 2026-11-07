@@ -36,7 +36,7 @@ export default function ReferenceControls({ project, engine, config, notify, onU
     </>}
     {s.mode === 'style' && <>
       <details className="mx-scale-rules" open={s.input === 'text' ? true : undefined}><summary>风格文字与AI提炼</summary>
-        <label className="mx-field"><span>提示词服务</span><select aria-label="风格提炼服务" value={s.provider} disabled={engine.locked} onChange={(e) => patch({ provider: e.target.value })}>{['gemini', 'openai', 'qwen'].map((p) => <option key={p} value={p}>{{ gemini: 'Gemini', openai: 'OpenAI', qwen: '千问' }[p]} · {config.configured[p] ? '已配置' : '未配置'}</option>)}</select></label>
+        <label className="mx-field"><span>提示词服务</span><select aria-label="风格提炼服务" value={s.provider} disabled={engine.locked} onChange={(e) => patch({ provider: e.target.value })}>{['gemini', 'openai', 'apiyi', 'qwen'].map((p) => <option key={p} value={p}>{{ gemini: 'Gemini', openai: 'OpenAI', apiyi: 'API易', qwen: '千问' }[p]} · {config.configured[p] ? '已配置' : '未配置'}</option>)}</select></label>
         <button className="mx-button" disabled={engine.locked || !project.styleAssetId} onClick={engine.extractStyle}>AI提炼文字风格 · 1次调用</button>
         <p className="mx-hint">仅点击才调用所选服务；不自动重提炼或生成图片。提炼结果可编辑，切到文字风格后不发送参考图。</p>
         {s.source?.model && <p className="mx-hint">上次提炼模型：{s.source.model}</p>}

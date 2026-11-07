@@ -1,3 +1,5 @@
+import { processStitch } from './stitch.js';
+import { overlapBand } from './stitchMath.js';
 import { effectiveReference } from './reference.js';
 import { seedReference } from './referenceImages.js';
 import { assetFor, intersection, polygonBounds, splitRect, tileRect, uid } from './core.js';
@@ -6,6 +8,10 @@ import { scaleRequestContext } from './scale.js';
 import { layerGenerationPrompts, LAYER_OPERATIONS } from './layerPrompts.js';
 import { geminiGroundFrame, MAP_REQUEST_LIMIT } from './geminiResolution.js';
 import { cleanMagenta, matteValid } from './chromaKey.js';
+import { gptImageSize } from './gptImageSize.js';
+import { gptExpansionFrame } from './gptExpansion.js';
+import { opaqueTerrainPixels } from './terrainAlpha.js';
+import { LEGACY_EXPANSION } from './simpleExpansion.js';
 
 export function canvas(width, height) {
   const w = Math.max(1, Math.round(width)), h = Math.max(1, Math.round(height));
@@ -76,29 +82,52 @@ function coverage(project, rect, parts = [], target = null) {
   if (target) for (const p of parts) ctx.fillRect(target.x + p.rect.x - rect.x, target.y + p.rect.y - rect.y, p.rect.width, p.rect.height);
   return c;
 }
-async function referenceForPart(project, assets, target, part, parts) {
-  const pad = Math.max(32, Math.round(Math.min(part.width, part.height) * .22));
+export async function referenceForPart(project, assets, target, part, parts) {
+  if (['openai','apiyi'].includes(project.provider)) {
+    const area={x:target.x+part.x,y:target.y+part.y,width:part.width,height:part.height};
+    const rect=gptExpansionFrame(area,[...project.tiles.map(t=>tileRect(project,t)),...parts.map(p=>({...p.rect,x:target.x+p.rect.x,y:target.y+p.rect.y}))]);
+    const image=await renderRect(project,assets,rect,'original');
+    for(const p of parts) image.getContext('2d').drawImage(await assetImage(p.assetId,assets),target.x+p.rect.x-rect.x,target.y+p.rect.y-rect.y);
+    const mask=coverage(project,rect,parts,target);
+    // Unknown pixels outside the requested segment remain protected.
+    const allowed=canvas(rect.width,rect.height),ac=allowed.getContext('2d');ac.fillStyle='#fff';ac.fillRect(0,0,rect.width,rect.height);
+    ac.clearRect(area.x-rect.x,area.y-rect.y,area.width,area.height);ac.drawImage(mask,0,0);
+    for(const t of project.tiles){const b=overlapBand(target,tileRect(project,t));const hit=b&&intersection(b,area);if(hit)ac.clearRect(hit.x-rect.x,hit.y-rect.y,hit.width,hit.height);}
+    return {image,mask:allowed,rect,pad:0,offsetX:area.x-rect.x,offsetY:area.y-rect.y,gptAnchor:true};
+  }
+  const needsContext = project.expansionContextEnabled === true;
+  const pad = needsContext ? Math.max(1, Math.round(Math.min(part.width, part.height) * .25)) : 0;
   const rect = { x: target.x + part.x - pad, y: target.y + part.y - pad, width: part.width + pad * 2, height: part.height + pad * 2 };
   const image = await renderRect(project, assets, rect, 'original'), ctx = image.getContext('2d');
   for (const completed of parts) ctx.drawImage(await assetImage(completed.assetId, assets), target.x + completed.rect.x - rect.x, target.y + completed.rect.y - rect.y, completed.rect.width, completed.rect.height);
   const known = coverage(project, rect, parts, target), mask = canvas(rect.width, rect.height), mc = mask.getContext('2d');
   mc.fillStyle = '#fff'; mc.fillRect(0, 0, mask.width, mask.height); mc.clearRect(pad, pad, part.width, part.height); mc.drawImage(known, 0, 0);
-  return { image, mask, known, rect, pad };
+  for (const t of project.tiles) { const band = overlapBand(target, tileRect(project, t)); if (band) mc.clearRect(band.x-rect.x,band.y-rect.y,band.width,band.height); }
+  // The editable output is always the target segment, never the enlarged context.
+  // Context is a separate reference; the output is mapped to the target frame.
+  // Models can still alter their apparent camera or object scale.
+  const targetImage=canvas(part.width,part.height),targetMask=canvas(part.width,part.height),targetKnown=canvas(part.width,part.height);
+  targetImage.getContext('2d').drawImage(image,pad,pad,part.width,part.height,0,0,part.width,part.height);
+  targetMask.getContext('2d').drawImage(mask,pad,pad,part.width,part.height,0,0,part.width,part.height);
+  targetKnown.getContext('2d').drawImage(known,pad,pad,part.width,part.height,0,0,part.width,part.height);
+  return { image:targetImage,mask:targetMask,known:targetKnown,rect:{x:target.x+part.x,y:target.y+part.y,width:part.width,height:part.height},pad:0,contextImage:image,contextMask:mask,contextRect:rect,contextPad:pad };
+
 }
 function providerRatio(provider, ratio) {
   if (provider === 'qwen') return Math.max(1 / 8, Math.min(8, ratio));
-  const list = provider === 'openai' ? [1, 1.5, 2 / 3] : provider === 'kling' ? [1, 16 / 9, 9 / 16, 4 / 3, 3 / 4, 1.5, 2 / 3, 21 / 9] : [1, 4 / 3, 1.5, 16 / 9, 5 / 4, 4 / 5, 3 / 4, 2 / 3, 9 / 16, 21 / 9];
+  const list = ['openai', 'apiyi'].includes(provider) ? [1, 1.5, 2 / 3] : provider === 'kling' ? [1, 16 / 9, 9 / 16, 4 / 3, 3 / 4, 1.5, 2 / 3, 21 / 9] : [1, 4 / 3, 1.5, 16 / 9, 5 / 4, 4 / 5, 3 / 4, 2 / 3, 9 / 16, 21 / 9];
   return list.reduce((best, v) => Math.abs(Math.log(ratio / v)) < Math.abs(Math.log(ratio / best)) ? v : best, 1);
 }
-export function frameReference(image, mask, provider, { preservePixels = false } = {}) {
-  const ratio = providerRatio(provider, image.width / image.height);
+export function frameReference(image, mask, provider, { preservePixels = false, outputRatio } = {}) {
+  const ratio = outputRatio || providerRatio(provider, image.width / image.height);
   let w = image.width, h = image.height;
   if (w / h > ratio) h = Math.ceil(w / ratio); else w = Math.ceil(h * ratio);
   if (preservePixels && provider === 'gemini') { const frame = geminiGroundFrame(image.width, image.height); w = frame.width; h = frame.height; }
   const scale = preservePixels ? 1 : Math.min(1, 1536 / Math.max(w, h)), x = Math.floor((w - image.width) / 2), y = Math.floor((h - image.height) / 2);
   const framed = canvas(w * scale, h * scale), ctx = framed.getContext('2d');
   if (preservePixels) { ctx.fillStyle = '#242424'; ctx.fillRect(0, 0, framed.width, framed.height); }
-  ctx.drawImage(image, x * scale, y * scale, image.width * scale, image.height * scale);
+  const draw = { x: x * scale, y: y * scale, width: image.width * scale, height: image.height * scale };
+  ctx.drawImage(image, draw.x, draw.y, draw.width, draw.height);
   let framedMask;
   if (mask) {
     framedMask = canvas(framed.width, framed.height); const mc = framedMask.getContext('2d');
@@ -106,7 +135,7 @@ export function frameReference(image, mask, provider, { preservePixels = false }
     mc.clearRect(x * scale, y * scale, image.width * scale, image.height * scale);
     mc.drawImage(mask, x * scale, y * scale, image.width * scale, image.height * scale);
   }
-  return { image: framed, mask: framedMask, crop: { x: x / w, y: y / h, width: image.width / w, height: image.height / h } };
+  return { image: framed, mask: framedMask, crop: { x: draw.x / framed.width, y: draw.y / framed.height, width: draw.width / framed.width, height: draw.height / framed.height } };
 }
 export function restorePixels(generated, original, mask) {
   const c = canvas(original.width, original.height), ctx = c.getContext('2d'); ctx.drawImage(generated, 0, 0, c.width, c.height);
@@ -127,13 +156,15 @@ export function mattePartPlan(width, height, divisions = 1) {
     return { index, rect, reference: { x: left, y: top, width: right - left, height: bottom - top } };
   });
 }
-export async function prepareMapImage(project, assets, operation, { image, mask, width, height, prompt } = {}) {
+export async function prepareMapImage(project, assets, operation, { image, mask, width, height, prompt, contextImage } = {}) {
   if (operation === 'seed') {
     if (effectiveReference(project).input === 'text') image = undefined;
     else if (!image) image = await seedReference(project, assets);
   }
-  let framed, requestCanvas = image;
+  let framed, guideCanvas, requestCanvas = image;
+  const customGptSize = project.provider === 'apiyi' && project.resolution !== 'native' ? gptImageSize(image?.width || width || project.tileWidth, image?.height || height || project.tileHeight, project.resolution) : null;
   const layerOperation = LAYER_OPERATIONS.includes(operation);
+  const supportsMaskedEdits = ['openai', 'apiyi'].includes(project.provider);
   const geminiGround = project.provider === 'gemini' && operation === 'ground';
   const preservePixels = geminiGround || project.provider === 'gemini' && ['2K', '4K'].includes(project.resolution);
   // Omni extraction uses the whole reference frame with auto aspect ratio, without padding/cropping.
@@ -141,25 +172,27 @@ export async function prepareMapImage(project, assets, operation, { image, mask,
   if (klingObjects) {
     const factor = Math.max(300 / Math.min(image.width, image.height), Math.min(1, 2048 / Math.max(image.width, image.height)));
     requestCanvas = canvas(image.width * factor, image.height * factor); requestCanvas.getContext('2d').drawImage(image, 0, 0, requestCanvas.width, requestCanvas.height);
-  } else if (image && !(layerOperation && project.provider === 'openai')) { framed = frameReference(image, mask, project.provider, { preservePixels }); requestCanvas = framed.image; }
+  } else if (image && !(layerOperation && supportsMaskedEdits)) { framed = frameReference(image, mask, project.provider, { preservePixels, outputRatio: customGptSize ? customGptSize.width / customGptSize.height : operation==='expand' && supportsMaskedEdits ? image.width/image.height : undefined }); requestCanvas = framed.image; }
   // Non-mask integrations receive a separate visible editing guide. Protected pixels are restored locally afterward.
-  if (requestCanvas && framed?.mask && project.provider !== 'openai') {
+  if (requestCanvas && framed?.mask) {
     const guide = canvas(requestCanvas.width, requestCanvas.height), gc = guide.getContext('2d'); gc.drawImage(requestCanvas, 0, 0);
     const editable = canvas(requestCanvas.width, requestCanvas.height), ec = editable.getContext('2d'); ec.fillStyle = 'rgba(255,45,112,.42)'; ec.fillRect(0, 0, editable.width, editable.height);
-    ec.globalCompositeOperation = 'destination-out'; ec.drawImage(framed.mask, 0, 0); gc.drawImage(editable, 0, 0); requestCanvas = guide;
+    ec.globalCompositeOperation = 'destination-out'; ec.drawImage(framed.mask, 0, 0); gc.drawImage(editable, 0, 0);
+    if (project.provider === 'kling') requestCanvas = guide; else if (!supportsMaskedEdits) guideCanvas = guide;
   }
   const base64 = (c) => c ? c.toDataURL('image/png').split(',')[1] : '';
   const scaleReference = ['seed', 'expand', 'retouch'].includes(operation) ? scaleRequestContext(project, image?.width || width || project.tileWidth, image?.height || height || project.tileHeight, framed?.crop) : undefined;
   const layerPrompt = layerOperation ? project.layerPrompts?.[operation] || '' : '';
-  const prompts = layerOperation ? layerGenerationPrompts(operation, requestCanvas?.width || width || project.tileWidth, requestCanvas?.height || height || project.tileHeight, layerPrompt) : mapGenerationPrompts(operation, prompt ?? project.prompt, project.negativePrompt, scaleReference);
+  const prompts = layerOperation ? layerGenerationPrompts(operation, requestCanvas?.width || width || project.tileWidth, requestCanvas?.height || height || project.tileHeight, layerPrompt) : mapGenerationPrompts(operation, prompt ?? (operation === 'expand' ? project.expansionDescription?.trim() || project.prompt : project.prompt), project.negativePrompt, scaleReference);
   const requestedResolution = geminiGround ? project.groundResolution || 'auto' : project.resolution;
   const body = JSON.stringify({
     operation, provider: project.provider, ...prompts, ...(operation === 'seed' ? { reference: effectiveReference(project) } : {}), ...(!layerOperation && ['seed', 'expand', 'retouch'].includes(operation) ? { globalPositivePrompt: project.globalPositivePrompt || '', globalNegativePrompt: project.globalNegativePrompt || '' } : {}), ...(layerOperation ? { layerPrompt } : {}), ...(scaleReference ? { scaleReference } : {}),
     width: requestCanvas?.width || width || project.tileWidth, height: requestCanvas?.height || height || project.tileHeight,
-    imageBase64: base64(requestCanvas), maskBase64: base64(framed?.mask || mask), mimeType: 'image/png', resolution: requestedResolution,
-    markedGuide: Boolean(framed?.mask && project.provider !== 'openai'),
+    ...(customGptSize ? { outputWidth: image?.width || width || project.tileWidth, outputHeight: image?.height || height || project.tileHeight } : {}),
+    contextImageBase64: project.provider !== 'kling' ? base64(contextImage) : '', imageBase64: base64(requestCanvas), guideImageBase64: base64(guideCanvas), maskBase64: base64(framed?.mask || mask), mimeType: 'image/png', resolution: requestedResolution,
+    markedGuide: Boolean(framed?.mask) && !supportsMaskedEdits, separateGuide: Boolean(guideCanvas),
   });
-  if (preservePixels && new TextEncoder().encode(body).byteLength > MAP_REQUEST_LIMIT) throw new Error('原图请求超过 36 MB 上传限制。为保留细节，未缩小图片，也未提交生成；请手动缩小原图或使用较小地图。');
+  if (new TextEncoder().encode(body).byteLength > MAP_REQUEST_LIMIT) throw new Error('原图请求超过 36 MB 上传限制。为保留细节，未缩小图片，也未提交生成；请手动缩小原图或使用较小地图。');
   return { body, image, mask, width, height, framed, requestCanvas, requestedResolution, preservePixels };
 }
 export async function requestImage(project, assets, operation, options = {}) {
@@ -184,25 +217,34 @@ export async function requestImage(project, assets, operation, options = {}) {
   if (!result.imageBase64) throw new Error('服务没有返回图像。');
   const raw = await loadImage(`data:${result.mimeType || 'image/png'};base64,${result.imageBase64}`);
   let rawAssetId;
-  if (preserveRaw) {
+  if (preserveRaw || operation === 'expand') {
     const bytes = Uint8Array.from(atob(result.imageBase64), (c) => c.charCodeAt(0));
     rawAssetId = await assets.put(new Blob([bytes], { type: result.mimeType || 'image/png' }));
   }
   const out = canvas(image?.width || width || project.tileWidth, image?.height || height || project.tileHeight), oc = out.getContext('2d');
   if (framed) { const r = framed.crop; oc.drawImage(raw, raw.width * r.x, raw.height * r.y, raw.width * r.width, raw.height * r.height, 0, 0, out.width, out.height); }
   else oc.drawImage(raw, 0, 0, out.width, out.height);
+  // A terrain result must not inherit the transparent outpainting canvas.
+  // Keep returned RGB (matting over black would darken every semi-transparent pixel).
+  if(['openai','apiyi'].includes(project.provider)&&['seed','expand','retouch'].includes(operation)) {
+    const pixels=oc.getImageData(0,0,out.width,out.height);
+    opaqueTerrainPixels(pixels.data);
+    oc.putImageData(pixels,0,0);
+  }
+  const alignedAssetId = operation === 'expand' ? await storeCanvas(out, assets) : undefined;
+  const postprocess = options.beforeRestore ? await options.beforeRestore(out) : undefined;
   const restored = mask ? restorePixels(out, image, mask) : out;
   const geminiObjects = project.provider === 'gemini' && operation === 'objects';
   const matteSourceAssetId = geminiObjects ? await storeCanvas(restored, assets) : undefined;
   const matteStats = geminiObjects ? cleanObjectMatte(restored, image) : undefined;
   const chromaKeyRemoved = geminiObjects ? matteValid(matteStats) : undefined;
   record({ status: 'success', diagnostics: result.diagnostics || null, submitted: result.submitted ?? true, finishedAt: Date.now() });
-  return { canvas: restored, chromaKeyRemoved, actualWidth: raw.width, actualHeight: raw.height, model: result.model,
+  return { canvas: restored, alignedAssetId, postprocess, chromaKeyRemoved, actualWidth: raw.width, actualHeight: raw.height, model: result.model,
     matteSourceAssetId, matteStats, rawAssetId, rawMimeType: result.mimeType || 'image/png', generation: {
-      ...result.generation, requestedResolution, resolvedResolution: result.generation?.resolvedResolution || requestedResolution, model: result.model,
+      ...result.generation, opaqueTerrain: ['openai','apiyi'].includes(project.provider)&&['seed','expand','retouch'].includes(operation), requestedResolution, resolvedResolution: result.generation?.resolvedResolution || requestedResolution, model: result.model,
       sourceWidth: image?.width || out.width, sourceHeight: image?.height || out.height,
       referenceWidth: requestCanvas?.width || out.width, referenceHeight: requestCanvas?.height || out.height,
-      actualWidth: raw.width, actualHeight: raw.height, alignedWidth: out.width, alignedHeight: out.height,
+      inputPolicy: operation === 'expand' ? 'target-frame-v1' : undefined, contextWidth: options.contextImage?.width, contextHeight: options.contextImage?.height, crop: framed?.crop || { x: 0, y: 0, width: 1, height: 1 }, actualWidth: raw.width, actualHeight: raw.height, alignedWidth: out.width, alignedHeight: out.height,
       upscaled: raw.width * (framed?.crop.width || 1) + .5 < out.width || raw.height * (framed?.crop.height || 1) + .5 < out.height,
     } };
   } catch (error) {
@@ -210,31 +252,42 @@ export async function requestImage(project, assets, operation, options = {}) {
     throw error;
   }
 }
-export async function generateTile(project, assets, targetSlot, { parts = [], onPart, signal, fetcher, requestTag = '' } = {}) {
+function nextExpansionPart(project, target, rectangles, completed) {
+  const remaining = rectangles.map((r, index) => ({ ...r, index })).filter((r) => !completed.some((p) => p.index === r.index));
+  // Start at the strongest existing edge; subsequent parts can use completed siblings.
+  const score = (r) => {
+      const world = { ...r, x: target.x + r.x - 24, y: target.y + r.y - 24, width: r.width + 48, height: r.height + 48 };
+      return [...project.tiles.map((t) => tileRect(project, t)), ...completed.map((p) => ({ ...p.rect, x: target.x + p.rect.x, y: target.y + p.rect.y }))].reduce((sum, t) => { const i = intersection(world, t); return sum + (i ? i.width * i.height : 0); }, 0);
+  };
+  return remaining.sort((a, b) => score(b) - score(a) || a.index - b.index)[0];
+}
+function expansionPartInputs(project, reference) {
+  if(reference.gptAnchor) return reference;
+  return { image: reference.image, mask: reference.mask, contextImage: project.expansionContextEnabled === true ? reference.contextImage : undefined, pad: reference.pad, rect: reference.rect };
+}
+export async function generateTile(project, assets, targetSlot, { parts = [], onPart, signal, fetcher, requestTag = '', expansionPolicy = project.expansionPolicy || LEGACY_EXPANSION } = {}) {
+  if (expansionPolicy !== LEGACY_EXPANSION) throw new Error('简化扩图流程已停用，请重新创建扩图任务。');
   const target = tileRect(project, targetSlot), rectangles = splitRect(project.tileWidth, project.tileHeight, project.subdivisions);
   const completed = [...parts]; let metadata = {};
   while (completed.length < rectangles.length) {
     if (signal?.aborted) throw new DOMException('已停止', 'AbortError');
-    const remaining = rectangles.map((r, index) => ({ ...r, index })).filter((r) => !completed.some((p) => p.index === r.index));
-    // Start at the strongest existing edge; subsequent parts can use completed siblings.
-    const score = (r) => {
-      const world = { ...r, x: target.x + r.x - 24, y: target.y + r.y - 24, width: r.width + 48, height: r.height + 48 };
-      return [...project.tiles.map((t) => tileRect(project, t)), ...completed.map((p) => ({ ...p.rect, x: target.x + p.rect.x, y: target.y + p.rect.y }))].reduce((sum, t) => { const i = intersection(world, t); return sum + (i ? i.width * i.height : 0); }, 0);
-    };
-    const part = remaining.sort((a, b) => score(b) - score(a) || a.index - b.index)[0];
+    const part = nextExpansionPart(project, target, rectangles, completed);
     const reference = await referenceForPart(project, assets, target, part, completed);
-    const result = await requestImage(project, assets, 'expand', { image: reference.image, mask: reference.mask, signal, fetcher, requestTag: `${requestTag} / 分段 ${part.index + 1}` });
-    const cropped = canvas(part.width, part.height); cropped.getContext('2d').drawImage(result.canvas, reference.pad, reference.pad, part.width, part.height, 0, 0, part.width, part.height);
+    const input = expansionPartInputs(project, reference);
+    const result = await requestImage(project, assets, 'expand', { ...input, signal, fetcher, requestTag: `${requestTag} / 分段 ${part.index + 1}` });
+    const cropped = canvas(part.width, part.height); cropped.getContext('2d').drawImage(result.canvas, input.offsetX ?? input.pad, input.offsetY ?? input.pad, part.width, part.height, 0, 0, part.width, part.height);
     const assetId = await storeCanvas(cropped, assets);
-    const item = { index: part.index, rect: { x: part.x, y: part.y, width: part.width, height: part.height }, assetId };
+    const item = { alignedAssetId: result.alignedAssetId, rawAssetId: result.rawAssetId, generation: result.generation, referenceRect: input.rect, pad: input.pad, offsetX:input.offsetX,offsetY:input.offsetY, index: part.index, rect: { x: part.x, y: part.y, width: part.width, height: part.height }, assetId };
     completed.push(item); metadata = result;
     await onPart?.([...completed]);
   }
   const full = canvas(project.tileWidth, project.tileHeight), fc = full.getContext('2d');
   for (const part of completed) fc.drawImage(await assetImage(part.assetId, assets), part.rect.x, part.rect.y, part.rect.width, part.rect.height);
-  return { id: uid(), x: targetSlot.x, y: targetSlot.y, px: target.x, py: target.y, width: full.width, height: full.height,
+  const generated = { id: uid(), x: targetSlot.x, y: targetSlot.y, px: target.x, py: target.y, width: full.width, height: full.height,
     originalId: await storeCanvas(full, assets), name: `地图块 ${targetSlot.x}, ${targetSlot.y}`, kind: 'generated', addedAt: Date.now(),
     actualWidth: metadata.actualWidth, actualHeight: metadata.actualHeight, model: metadata.model, completedParts: completed };
+  const processed = await processStitch(project, assets, generated);
+  return { ...processed.tile, stitchUpdates: processed.updates };
 }
 export async function processedMatte(tile, assets, rawMaskId, threshold = 128, feather = 1) {
   const raw = canvas(tile.width, tile.height), rc = raw.getContext('2d'); rc.drawImage(await assetImage(rawMaskId, assets), 0, 0, raw.width, raw.height);
@@ -291,11 +344,23 @@ export async function retouchTile(project, assets, tile, points, prompt, signal)
   return { ...tile, originalId: await storeCanvas(result.canvas, assets), groundId: '', objectsId: '', maskId: '', rawMaskId: '', layerDraft: null, actualWidth: result.actualWidth, actualHeight: result.actualHeight };
 }
 
+export async function previewExpansionTemplate(project, assets, targetSlot) {
+  const target = tileRect(project, targetSlot), rectangles = splitRect(project.tileWidth, project.tileHeight, project.subdivisions);
+  const work = project.work;
+  const completed = work?.status === 'paused' && work.target?.x === targetSlot.x && work.target?.y === targetSlot.y ? work.completedParts || [] : [];
+  const part = nextExpansionPart(project, target, rectangles, completed);
+  if (!part) throw new Error('该扩图任务没有待生成的分段。');
+  const reference = await referenceForPart(project, assets, target, part, completed);
+  const prepared = await prepareMapImage(project, assets, 'expand', expansionPartInputs(project, reference));
+  const request = JSON.parse(prepared.body);
+  return { image: prepared.requestCanvas.toDataURL('image/png'), width: prepared.requestCanvas.width, height: prepared.requestCanvas.height, part: part.index + 1, editMask: ['openai', 'apiyi'].includes(project.provider), maskImage: request.maskBase64 ? `data:image/png;base64,${request.maskBase64}` : '', guideImage: request.guideImageBase64 ? `data:image/png;base64,${request.guideImageBase64}` : '', contextImage: request.contextImageBase64 ? `data:image/png;base64,${request.contextImageBase64}` : '' };
+}
+
 export async function previewExpansion(project, assets, targetSlot, { signal } = {}) {
   const target = tileRect(project, targetSlot), rectangles = splitRect(project.tileWidth, project.tileHeight, project.subdivisions), results = [];
   for (let index = 0; index < rectangles.length; index++) {
     const reference = await referenceForPart(project, assets, target, rectangles[index], []);
-    const diagnostics = await requestImage(project, assets, 'expand', { image: reference.image, mask: reference.mask, signal, previewOnly: true });
+    const diagnostics = await requestImage(project, assets, 'expand', { ...expansionPartInputs(project, reference), signal, previewOnly: true });
     results.push({ ...diagnostics, part: index + 1 });
   }
   return results;

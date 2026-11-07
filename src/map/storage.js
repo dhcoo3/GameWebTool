@@ -96,5 +96,18 @@ export async function importPortable(files, assets) {
     if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, typeof v === 'string' && remap.has(v) ? remap.get(v) : replace(v)]));
     return value;
   };
-  return normalizeProject({ ...replace(saved), id: null });
+  const restored = replace(saved);
+  // Work signatures contain JSON-encoded source IDs (and, for replacement,
+  // another encoded signature). Remap those IDs along with the saved assets.
+  const remapSignature = (value) => {
+    if (Array.isArray(value)) return value.map(remapSignature);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, remapSignature(item)]));
+    if (typeof value !== 'string') return value;
+    if (remap.has(value)) return remap.get(value);
+    if (/^[\[{]/.test(value)) { try { return JSON.stringify(remapSignature(JSON.parse(value))); } catch { /* user text, not a signature */ } }
+    return value;
+  };
+  if (restored.work?.signature) restored.work.signature = remapSignature(saved.work.signature);
+  if (restored.retiredExpansionWork?.signature) restored.retiredExpansionWork.signature = remapSignature(saved.retiredExpansionWork.signature);
+  return normalizeProject({ ...restored, id: null });
 }

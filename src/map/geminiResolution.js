@@ -22,7 +22,7 @@ export function validateGeminiResolution(model, resolution = 'native') {
   if (!geminiResolutions(model).includes(resolution)) throw Object.assign(new Error(`当前 Gemini 模型 ${model} 不支持 ${resolution} 输出。请求尚未提交，请调整尺寸或模型。`), { status: 400 });
   return resolution;
 }
-export const resolutionLabel = (value) => value === 'native' ? '服务原生尺寸' : value === '512' ? '512 · 0.5K' : value;
+export const resolutionLabel = (value) => value === 'native' ? '服务原生尺寸' : value === 'match' ? '匹配地图画幅' : value === '512' ? '512 · 0.5K' : value;
 
 export function geminiGroundResolutions(model) {
   if (HIGH_RES_MODELS.has(model)) return [...GEMINI_GROUND_RESOLUTIONS];

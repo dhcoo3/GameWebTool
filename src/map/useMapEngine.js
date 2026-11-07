@@ -1,19 +1,23 @@
+import { pendingTiles } from './pendingTiles.js';
+import { reprocessStitch } from './stitch.js';
+import { expansionStamp, repairSeam, recolorSeam, seamStamp } from './seams.js';
 import { normalizeReferenceSettings } from './reference.js';
 import { referenceSample } from './referenceImages.js';
 import { regionPolygon } from './regionDrawing.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { batchTargets, DRAFT_ID, keyOf, newProject, readyTasks, reflow, tileRect, uid } from './core.js';
+import { batchTargets, DRAFT_ID, keyOf, newProject, normalizeProject, readyTasks, reflow, tileRect, uid } from './core.js';
 import { AssetStore, listProjects, migrateProject, readProject, saveProject } from './storage.js';
-import { assetImage, canvas, cleanObjectMatte, generateGround, groundInputs, previewExpansion, previewRetouch, generateMatteTile, generateTile, importImage, processedMatte, requestImage, retouchTile, storeCanvas } from './images.js';
+import { assetImage, canvas, cleanObjectMatte, generateGround, groundInputs, previewExpansion, previewExpansionTemplate, previewRetouch, generateMatteTile, generateTile, importImage, processedMatte, requestImage, retouchTile, storeCanvas } from './images.js';
 import { importProjectZip } from './exports.js';
 import { normalizeScaleReference, scaleGenerationFingerprint } from './scale.js';
 import { characterImageBounds } from './characterImage.js';
 import { rebuildLayer, importLayerImage, layerAlphaValid, validLayerPair } from './layers.js';
 import { matteValid } from './chromaKey.js';
 import { supportsObjectLayers } from './layerCapabilities.js';
+import { SIMPLE_EXPANSION, LEGACY_EXPANSION } from './simpleExpansion.js';
 
 const globalRulesStamp = (p) => JSON.stringify([p.globalPositivePrompt || '', p.globalNegativePrompt || '']);
-const sourceStamp = (p) => JSON.stringify([p.overlapX, p.overlapY, p.tiles.map((t) => [t.id, t.originalId]), scaleGenerationFingerprint(p), globalRulesStamp(p)]);
+const sourceStamp = (p) => JSON.stringify([expansionStamp(p),p.overlapX, p.overlapY, p.tiles.map((t) => [t.id, tileRect(p, t), t.originalId]), scaleGenerationFingerprint(p), globalRulesStamp(p)]);
 
 export default function useMapEngine({ config, serverOffline, onOpenSettings, notify }) {
   const assets = useMemo(() => new AssetStore(), []);
@@ -36,13 +40,13 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
     if (!mounted.current) return;
     const current = ref.current; let next = typeof change === 'function' ? change(current) : change;
     // Edits invalidate unfinished work; opening a saved project preserves its resumable snapshot.
-    if (current.tiles === next.tiles && (scaleGenerationFingerprint(current) !== scaleGenerationFingerprint(next) || globalRulesStamp(current) !== globalRulesStamp(next))) { next = { ...next, work: null, queue: null }; setPending(null); }
+    if (current.tiles === next.tiles && (scaleGenerationFingerprint(current) !== scaleGenerationFingerprint(next) || globalRulesStamp(current) !== globalRulesStamp(next) || expansionStamp(current) !== expansionStamp(next) || current.expansionPolicy !== next.expansionPolicy)) { next = { ...next, ...(current.queue?.retired ? { retiredExpansionQueues: [...(next.retiredExpansionQueues || []), current.queue] } : {}), work: null, queue: null }; setPending(null); }
     if (current === next) return;
     if (record) pushHistory(current);
     ref.current = next; setProject(next);
   }, [pushHistory]);
   assets.onRequest = (event) => {
-    if (!mounted.current || event.taskId !== assets.requestTaskId) return;
+    if (!mounted.current || !event.taskId || event.taskId !== assets.requestTaskId) return;
     const previous = ref.current.requestLog?.id === event.taskId ? ref.current.requestLog : { id: event.taskId || uid(), name: assets.requestTaskName || '地图生成', startedAt: Date.now(), requests: [] };
     const existing = previous.requests.find((r) => r.requestId === event.requestId);
     const record = { ...existing, ...event };
@@ -56,7 +60,7 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
     readProject(DRAFT_ID).then(async (saved) => {
       if (!saved) return;
       const p = await migrateProject(saved, assets);
-      if (!cancelled) { ref.current = p; setProject(p); }
+      if (!cancelled) { ref.current = p; setProject(p); const review = p.queue?.tasks.find(t=>t.status==='review'&&t.reviewTile); if(review) setPending({tile:review.reviewTile,mode:'add',queueTaskId:review.id,sourceStamp:sourceStamp(p)}); }
     }).catch((e) => !cancelled && notify(`恢复草稿失败：${e.message}`)).finally(() => { if (!cancelled) { restored.current = true; setReady(true); } });
     return () => { cancelled = true; if (restored.current) saveProject(ref.current, true).catch(() => {}); mounted.current = false; epoch.current++; layerEpoch.current++; controller.current?.abort(); for (const c of batchControllers.current.values()) c.abort(); for (const c of layerControllers.current.values()) c.abort(); assets.release(); };
   }, [assets, notify]);
@@ -70,8 +74,8 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
     if (!config.configured[ref.current.provider]) { notify('请先配置当前图像服务的 API key。'); onOpenSettings(); return false; }
     return true;
   };
-  async function run(label, action, needsService = true) {
-    if (locked || controller.current || pump.current || layerPump.current || (needsService && !guardService())) return;
+  async function run(label, action, needsService = true, allowReview = false) {
+    if ((locked && !(allowReview && ready && !busy && !layerQueueLocked && !pumpActive && !layerPumpActive && ref.current.queue?.status==='paused')) || controller.current || pump.current || layerPump.current || (needsService && !guardService())) return;
     assets.activeTrace = null;
     if (needsService) { assets.requestTaskId = uid(); assets.requestTaskName = label; assets.activeTrace = null; }
     const token = ++epoch.current, abort = new AbortController(); controller.current = abort; setBusy(label); setError('');
@@ -89,7 +93,7 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
   const load = async (saved) => {
     if (locked) return;
     assets.requestTaskId = null; assets.activeTrace = null;
-    try { const next = await migrateProject(saved, assets); pushHistory(ref.current); apply(next, false); setPending(null); setSelectedId(next.tiles[0]?.id || ''); setSelectedRegionId(''); notify(saved.schemaVersion === 2 ? '项目已打开。' : '旧地图已作为升级副本打开，原项目保留。'); }
+    try { const next = await migrateProject(saved, assets); pushHistory(ref.current); apply({ ...next, tiles:[...next.tiles] }, false); const review=next.queue?.tasks.find(t=>t.status==='review'&&t.reviewTile);setPending(review?{tile:review.reviewTile,mode:'add',queueTaskId:review.id,sourceStamp:sourceStamp(next)}:null); setSelectedId(next.tiles[0]?.id || ''); setSelectedRegionId(''); notify(saved.schemaVersion === 2 ? '项目已打开。' : '旧地图已作为升级副本打开，原项目保留。'); }
     catch (e) { notify(`打开失败：${e.message}`); }
   };
   const createNew = () => {
@@ -175,29 +179,65 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
     const tile = { id: uid(), x: 0, y: 0, px: 0, py: 0, width: p.tileWidth, height: p.tileHeight, originalId, name: '初始地图', kind: 'base', addedAt: Date.now(), actualWidth: result.actualWidth, actualHeight: result.actualHeight, model: result.model };
     apply((value) => ({ ...p, id: null, scaleReference: { ...p.scaleReference, position: value.scaleReference.position, visible: value.scaleReference.visible }, tiles: [tile], regions: [], work: null, queue: null, layerQueue: null })); setSelectedId(tile.id); setPending(null); notify('初始地图已生成。');
   });
+  const regenerateSelectedTile = () => run('正在重新生成所选地图块', async (p, signal, current) => {
+    if (!selectedTile) throw new Error('请先选择要重新生成的地图块。');
+    const target = { x: selectedTile.x, y: selectedTile.y };
+    let replacement;
+    if (p.tiles.length === 1) {
+      const result = await requestImage(p, assets, 'seed', { signal });
+      if (!current()) return;
+      replacement = { ...selectedTile, originalId: await storeCanvas(result.canvas, assets), groundId: '', objectsId: '', maskId: '', rawMaskId: '', layerDraft: null,
+        actualWidth: result.actualWidth, actualHeight: result.actualHeight, model: result.model, generation: result.generation };
+    } else {
+      const sourceProject = { ...p, tiles: p.tiles.filter((item) => item.id !== selectedTile.id) };
+      const signature = JSON.stringify(['replace-tile', selectedTile.id, target, sourceStamp(p), p.subdivisions, p.provider, p.resolution, p.prompt, p.negativePrompt]);
+      const matching = p.work?.signature === signature && (!p.work.expansionPolicy || p.work.expansionPolicy === p.expansionPolicy);
+      if (matching && p.work.traceId) assets.requestTaskId = p.work.traceId;
+      const traceId = assets.requestTaskId, parts = matching ? p.work.completedParts : [];
+      const expansionPolicy = matching ? p.work.expansionPolicy || LEGACY_EXPANSION : LEGACY_EXPANSION;
+      apply((value) => ({ ...value, work: { signature, traceId, target, replaceId: selectedTile.id, expansionPolicy, completedParts: parts, status: 'running' } }), false);
+      try {
+        const generated = await generateTile(sourceProject, assets, selectedTile, { parts, signal, expansionPolicy, onPart: (completedParts) => {
+          if (current()) apply((value) => ({ ...value, work: { signature, traceId, target, replaceId: selectedTile.id, expansionPolicy, completedParts, status: 'running' } }), false);
+        } });
+        replacement = { ...generated, id: selectedTile.id, name: selectedTile.name || generated.name, kind: selectedTile.kind || 'generated' };
+        if (current()) apply((value) => ({ ...value, work: { ...value.work, status: 'complete' } }), false);
+      } catch (error) {
+        if (current()) apply((value) => ({ ...value, work: { ...value.work, status: 'paused' } }), false);
+        throw error;
+      }
+    }
+    if (current()) { setPending({ tile: replacement, mode: 'replace', previewKind: 'regenerate', sourceStamp: sourceStamp(p) }); notify('新地图块预览已就绪。接纳后替换当前所选图块，丢弃则保留原图。'); }
+  });
   const expand = (direction) => run('正在生成相邻地图', async (p, signal, current) => {
     if (!selectedTile) throw new Error('请先选择地图块。');
     const target = { x: selectedTile.x + direction.dx, y: selectedTile.y + direction.dy };
     if (p.tiles.some((t) => t.x === target.x && t.y === target.y)) throw new Error('目标位置已有图块。');
-    const signature = JSON.stringify([target, p.tiles.map((t) => [t.id, t.originalId]), p.overlapX, p.overlapY, p.subdivisions, p.provider, p.resolution, p.prompt, p.negativePrompt, scaleGenerationFingerprint(p), globalRulesStamp(p)]);
-    const matching = p.work?.signature === signature;
+    const signature = JSON.stringify([expansionStamp(p), target, p.tiles.map((t) => [t.id, t.originalId]), p.overlapX, p.overlapY, p.subdivisions, p.provider, p.resolution, p.prompt, p.negativePrompt, scaleGenerationFingerprint(p), globalRulesStamp(p)]);
+    const matching = p.work?.signature === signature && (!p.work.expansionPolicy || p.work.expansionPolicy === p.expansionPolicy);
     if (matching && p.work.traceId) assets.requestTaskId = p.work.traceId;
     const traceId = assets.requestTaskId;
     const parts = matching ? p.work.completedParts : [];
-    apply((v) => ({ ...v, work: { signature, traceId, target, completedParts: parts, status: 'running' } }), false);
+    const expansionPolicy = matching ? p.work.expansionPolicy || LEGACY_EXPANSION : LEGACY_EXPANSION;
+    apply((v) => ({ ...v, work: { signature, traceId, target, expansionPolicy, completedParts: parts, status: 'running' } }), false);
     try {
-      const tile = await generateTile(p, assets, target, { parts, signal, onPart: (completedParts) => { if (current()) apply((v) => ({ ...v, work: { signature, traceId, target, completedParts, status: 'running' } }), false); } });
+      const tile = await generateTile(p, assets, target, { parts, signal, expansionPolicy, onPart: (completedParts) => { if (current()) apply((v) => ({ ...v, work: { signature, traceId, target, expansionPolicy, completedParts, status: 'running' } }), false); } });
       if (current()) { setPending({ tile, mode: 'add', sourceStamp: sourceStamp(p) }); apply((v) => ({ ...v, work: { ...v.work, status: 'complete' } }), false); notify('生成结果已就绪，请检查后接纳。'); }
     } catch (e) { if (current()) apply((v) => ({ ...v, work: { ...v.work, status: 'paused' } }), false); throw e; }
   });
   const accept = () => {
-    if (!pending || busy || queueLocked) return;
-    const { tile, mode } = pending;
-    if (pending.sourceStamp !== sourceStamp(ref.current)) { setPending(null); return notify('参考图或地图位置已变更，请重新生成预览。'); }
+    if (!pending || busy || (queueLocked && !pending.queueTaskId)) return;
+    if (pending.mode === 'multi-replace') {
+      if (pending.seamStamp !== seamStamp(ref.current) || pending.sourceStamp !== sourceStamp(ref.current)) { setPending(null); return notify('地图或生成参数已变更，请重新生成接缝预览。'); }
+      apply((p) => ({ ...p, tiles: pendingTiles(p,pending).map(t=>({...t,stitchUpdates:undefined})), work: null, queue: null, layerQueue: null }));
+      setPending(null); notify('接缝修复已接纳，可一次撤销。请复查修改范围内的碰撞与遮挡标记。'); return;
+    }
+    const { tile: previewTile, mode } = pending; const tile={...previewTile,stitchUpdates:undefined}; const neighborUpdates=previewTile.stitchUpdates;
+    if (!pending.queueTaskId && pending.sourceStamp !== sourceStamp(ref.current)) { setPending(null); return notify('参考图或地图位置已变更，请重新生成预览。'); }
     if (mode === 'add' && ref.current.tiles.some((t) => t.x === tile.x && t.y === tile.y)) return notify('目标已被占用。');
-    apply((p) => ({ ...p, tiles: mode === 'replace' ? p.tiles.map((t) => t.id === tile.id ? tile : t) : [...p.tiles, tile], work: null })); setSelectedId(tile.id); setPending(null); notify('地图块已接纳。');
+    apply((p) => ({ ...p, tiles: [...p.tiles.map((t) => neighborUpdates?.find(u=>u.id===t.id) || (mode === 'replace' && t.id === tile.id ? tile : t)), ...(mode==='add'?[tile]:[])], work: null, ...(pending.queueTaskId ? { queue: { ...p.queue, status:p.queue.retired ? 'stopped' : 'paused',tasks:p.queue.tasks.map(t=>t.id===pending.queueTaskId?{...t,status:'done',reviewTile:null}:t) } } : {}) })); setSelectedId(tile.id); setPending(null); notify('地图块已接纳。');
   };
-  const discard = () => { if (busy) return; setPending(null); apply((p) => ({ ...p, work: null }), false); };
+  const discard = () => { if (busy) return; if(pending?.queueTaskId) updateQueue(q=>({...q,status:'stopped',tasks:q.tasks.map(t=>t.id===pending.queueTaskId?{...t,status:'waiting',reviewTile:null,...(q.settings?.expansionPolicy === SIMPLE_EXPANSION ? { completedParts: [] } : {})}:t)})); setPending(null); apply((p) => ({ ...p, work: null }), false); };
   const changeOverlap = (x, y) => { if (!locked) { apply((p) => ({ ...reflow(p, x, y), work: null })); setPending(null); } };
   const changeTile = (id, change, record = true) => apply((p) => ({ ...p, tiles: p.tiles.map((t) => t.id === id ? { ...t, ...change } : t) }), record);
   const matte = (withGround = false) => run(withGround ? '正在自动分层（蒙版 → 物件 → 地面）' : '正在生成物件蒙版', async (p, signal, current) => {
@@ -324,15 +364,36 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
       notify(`本地清理完成：移除 ${stats.removedPixels.toLocaleString()} 个紫底像素，修整 ${stats.decontaminatedPixels.toLocaleString()} 个边缘像素。可撤销；未提交生图请求。`);
     }
   }, false);
-  const acceptLayers = () => { const draft = selectedTile?.layerDraft; if (locked || !validLayerPair(draft)) return; changeTile(selectedTile.id, { ...draft, layerDraft: null }); notify('地面与物件层已接纳，原图仍保留。'); };
+  const acceptLayers = () => { const draft = selectedTile?.layerDraft; if (locked || !validLayerPair(draft)) return; changeTile(selectedTile.id, { ...draft, needsRelayer: false, layerDraft: null }); notify('地面与物件层已接纳，原图仍保留。'); };
   const acceptAllLayers = () => {
     if (locked) return;
     const ids = new Set(ref.current.tiles.filter((tile) => validLayerPair(tile.layerDraft)).map((tile) => tile.id));
     if (!ids.size) return notify('没有可接纳的物件层预览。');
-    apply((p) => ({ ...p, tiles: p.tiles.map((tile) => ids.has(tile.id) ? { ...tile, ...tile.layerDraft, layerDraft: null } : tile) }));
+    apply((p) => ({ ...p, tiles: p.tiles.map((tile) => ids.has(tile.id) ? { ...tile, ...tile.layerDraft, needsRelayer: false, layerDraft: null } : tile) }));
     notify(`已接纳 ${ids.size} 个物件层预览，原图仍保留。`);
   };
   const discardLayers = () => { if (!locked && selectedTile) changeTile(selectedTile.id, { layerDraft: null }); };
+  const reprocessExpansion = (feather = pending?.tile?.stitch?.feather ?? ref.current.stitchFeather ?? 8) => run('正在本地重新处理拼接', async (p, signal, current) => {
+    const target = pending?.tile || selectedTile; if (!target) throw new Error('请先选择已有图块。');
+    const source = pending?.mode === 'add' ? p : { ...p, tiles:p.tiles.filter(t=>t.id!==target.id) };
+    const processed = await reprocessStitch(source, assets, target, {feather});
+    if (current()) { const tile={...processed.tile,stitchUpdates:processed.updates};if(pending?.queueTaskId) updateQueue(q=>({...q,tasks:q.tasks.map(t=>t.id===pending.queueTaskId?{...t,reviewTile:tile,error:processed.diagnostics.warnings.join('；')}:t)}));setPending({tile,mode:pending?.mode||'replace',queueTaskId:pending?.queueTaskId,sourceStamp:sourceStamp(p),previewKind:'stitch'});notify('本地拼接预览已更新，未调用 AI。'); }
+  }, false, true);
+  const correctSeamColors = () => run('正在本地校正接缝颜色', async (p, signal, current) => {
+    if (pending?.previewKind !== 'seam' || pending.seamStamp !== seamStamp(p) || pending.sourceStamp !== sourceStamp(p)) throw new Error('接缝预览已失效，请重新生成。');
+    const source={...p,tiles:pending.repairSourceTiles||p.tiles};
+    const preview = await recolorSeam(source, assets, pending);
+    preview.repairSourceTiles=source.tiles;preview.finalTiles=source.tiles.map(t=>preview.tiles.find(v=>v.id===t.id)||t);preview.seamStamp=seamStamp(p);
+    if (current()) { setPending({ ...preview, sourceStamp: sourceStamp(p) }); notify(preview.colorMatch?.applied ? '已按周围地图校正修复块颜色，未调用 AI。' : '周围参考像素不足或变化较大，未强制校色；未调用 AI。'); }
+  }, false);
+  const repairSeams = (points) => run('正在修复跨图块接缝', async (p, signal, current) => {
+    const source = { ...p, tiles: pendingTiles(p,pending) };
+    const preview = await repairSeam(source, assets, points, { signal });
+    preview.repairSourceTiles=source.tiles;
+    preview.finalTiles=source.tiles.map(t=>preview.tiles.find(v=>v.id===t.id)||t);
+    preview.seamStamp=seamStamp(p);
+    if (current()) { setPending({ ...preview, sourceStamp: sourceStamp(p) }); notify('接缝修复预览已就绪，请对照原图后接纳。'); }
+  });
   const retouch = (points, prompt) => run('正在局部重绘', async (p, signal, current) => {
     if (!selectedTile || points.length < 3) throw new Error('请先选择图块，并在图块上绘制重绘区域。');
     const tile = await retouchTile(p, assets, selectedTile, points, prompt, signal); if (current()) { setPending({ tile, mode: 'replace', sourceStamp: sourceStamp(p) }); notify('局部重绘预览已就绪。'); }
@@ -396,6 +457,7 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
         const p = ref.current, q = p.queue;
         if (q) { assets.requestTaskId = q.id; assets.requestTaskName = '自动扩图'; }
         if (!q || !['running', 'pausing', 'paused'].includes(q.status)) break;
+        if (q.settings?.expansionPolicy === SIMPLE_EXPANSION) { updateQueue((v) => ({ ...v, retired: true, status: 'stopped' })); break; }
         if (q.status === 'running') {
           for (const task of readyTasks(p, q.tasks).slice(0, Math.max(0, q.concurrency - running.size))) {
             updateQueue((v) => ({ ...v, tasks: v.tasks.map((t) => t.id === task.id ? { ...t, status: 'running', error: '' } : t) }));
@@ -403,9 +465,15 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
             const job = (async () => {
               try {
                 const snapshot = { ...ref.current, ...q.settings };
-                const tile = await generateTile(snapshot, assets, task, { requestTag: `图块 (${task.x},${task.y})`, parts: task.completedParts, signal: abort.signal,
+                const expansionPolicy = q.settings?.expansionPolicy || LEGACY_EXPANSION;
+                const tile = await generateTile(snapshot, assets, task, { requestTag: `图块 (${task.x},${task.y})`, parts: task.completedParts, signal: abort.signal, expansionPolicy,
                   onPart: (completedParts) => { if (current() && !abort.signal.aborted) updateQueue((v) => ({ ...v, tasks: v.tasks.map((t) => t.id === task.id ? { ...t, completedParts } : t) })); } });
-                if (current() && !abort.signal.aborted) apply((v) => ({ ...v, tiles: v.tiles.some((t) => keyOf(t.x, t.y) === keyOf(tile.x, tile.y)) ? v.tiles : [...v.tiles, tile], queue: { ...v.queue, tasks: v.queue.tasks.map((t) => t.id === task.id ? { ...t, status: 'done' } : t) } }), false);
+                if (current() && !abort.signal.aborted) {
+                  if (expansionPolicy === SIMPLE_EXPANSION || !tile.stitch?.diagnostics.reliable) {
+                    updateQueue(v=>({...v,status:'paused',tasks:v.tasks.map(t=>t.id===task.id?{...t,status:'review',reviewTile:tile,error:tile.stitch?.diagnostics.warnings.join('；') || ''}:t)}));
+                    setPending({tile,mode:'add',queueTaskId:task.id,sourceStamp:sourceStamp(ref.current)});notify('自动扩图已暂停：请检查并接纳预览。');
+                  } else apply((v) => ({ ...v, tiles: v.tiles.some((t) => keyOf(t.x, t.y) === keyOf(tile.x, tile.y)) ? v.tiles : [...v.tiles.map(t=>tile.stitchUpdates?.find(u=>u.id===t.id)||t), {...tile,stitchUpdates:undefined}], queue: { ...v.queue, tasks: v.queue.tasks.map((t) => t.id === task.id ? { ...t, status: 'done' } : t) } }), false);
+                }
               } catch (e) {
                 if (current() && !abort.signal.aborted) { updateQueue((v) => ({ ...v, status: 'paused', tasks: v.tasks.map((t) => t.id === task.id ? { ...t, status: 'failed', error: e.message } : t) })); notify(`自动扩图已暂停：${e.message}`); }
               } finally { if (batchControllers.current.get(task.id) === abort) batchControllers.current.delete(task.id); }
@@ -428,12 +496,19 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
   const startBatch = (width, height, concurrency) => {
     if (locked || !selectedTile || !guardService()) return;
     const p = ref.current, tasks = batchTargets(p, selectedTile, width, height); if (!tasks.length) return notify('范围内没有待生成的空位。');
-    const baseline = { ...p, queue: null, work: null };
-    apply({ ...p, work: null, queue: { id: uid(), status: 'running', concurrency, tasks, baseline, settings: { provider: p.provider, resolution: p.resolution, subdivisions: p.subdivisions, prompt: p.prompt, negativePrompt: p.negativePrompt, globalPositivePrompt: p.globalPositivePrompt, globalNegativePrompt: p.globalNegativePrompt, grid: { ...p.grid }, pixelsPerUnit: p.pixelsPerUnit, scaleReference: normalizeScaleReference(p.scaleReference) } } }); setPending(null); pumpQueue();
+    if (p.queue?.retired && p.queue.tasks.some((task) => task.status === 'review')) return notify('请先接纳或丢弃已停用队列的待检查结果。');
+    const retiredExpansionQueues = p.queue?.retired ? [...(p.retiredExpansionQueues || []), p.queue] : p.retiredExpansionQueues;
+    const baseline = { ...p, retiredExpansionQueues, queue: null, work: null };
+    const expansionPolicy = LEGACY_EXPANSION;
+    apply({ ...p, retiredExpansionQueues, work: null, queue: { id: uid(), status: 'running', concurrency, tasks, baseline, settings: { expansionPolicy, stitchFeather:p.stitchFeather, expansionContext: p.expansionContext, expansionContextEnabled: p.expansionContextEnabled === true, expansionDescription: p.expansionDescription, expansionStrategy: 8, provider: p.provider, resolution: p.resolution, subdivisions: p.subdivisions, prompt: p.prompt, negativePrompt: p.negativePrompt, globalPositivePrompt: p.globalPositivePrompt, globalNegativePrompt: p.globalNegativePrompt, grid: { ...p.grid }, pixelsPerUnit: p.pixelsPerUnit, scaleReference: normalizeScaleReference(p.scaleReference) } } }); setPending(null); pumpQueue();
   };
+  const showQueueReview = (id) => { const task=ref.current.queue?.tasks.find(t=>t.id===id&&t.reviewTile);if(task)setPending({tile:task.reviewTile,mode:'add',queueTaskId:id,sourceStamp:sourceStamp(ref.current)}); };
   const pauseBatch = () => updateQueue((q) => ({ ...q, status: 'pausing' }));
   const resumeBatch = () => {
-    if (pump.current || !ref.current.queue || !guardService()) return;
+    if (pump.current || !ref.current.queue) return;
+    if (ref.current.queue.retired || ref.current.queue.settings?.expansionPolicy === SIMPLE_EXPANSION) return notify('此简化扩图队列已停用；已生成的结果保留，请新建旧版扩图任务。');
+    if (!guardService()) return;
+    if(ref.current.queue.tasks.some(t=>t.status==='review')) return notify('请先接纳或丢弃待检查的拼接预览。');
     if (!history.current.past.length && ref.current.queue.baseline) pushHistory(ref.current.queue.baseline);
     updateQueue((q) => ({ ...q, status: 'running', tasks: q.tasks.map((t) => t.status === 'failed' || t.status === 'running' ? { ...t, status: 'waiting', error: '' } : t) })); pumpQueue();
   };
@@ -441,10 +516,10 @@ export default function useMapEngine({ config, serverOffline, onOpenSettings, no
     epoch.current++; for (const c of batchControllers.current.values()) c.abort(); batchControllers.current.clear(); pump.current = false; setPumpActive(false);
     updateQueue((q) => ({ ...q, status: 'stopped', tasks: q.tasks.map((t) => t.status === 'running' ? { ...t, status: 'waiting' } : t) })); notify('队列已停止，完成的图块与分段已保留。');
   };
-  const undoBatch = () => { if (!pumpActive && !busy && ref.current.queue?.baseline) { apply(ref.current.queue.baseline); setPending(null); notify('本批生成的图块已撤销。'); } };
+  const undoBatch = () => { if (!pumpActive && !busy && ref.current.queue?.baseline) { apply(normalizeProject(ref.current.queue.baseline)); setPending(null); notify('本批生成的图块已撤销。'); } };
   return { project, ref, assets, ready, busy, error, clearError: () => setError(''), pending, selectedTile, selectedRegion, selectedId, selectedRegionId, setSelectedId, setSelectedRegionId,
-    locked, pumpActive, layerPumpActive, apply, patch, updateScaleReference, loadScalePreset, importCharacter, save, load, listProjects, createNew, importBase, importStyle, importZip, extractStyle, previewPrompts, seed, expand, accept, discard, cancel, changeOverlap,
-    matte, ground, generateLayer, importLayer, cleanObjects, editMatte, acceptLayers, acceptAllLayers, discardLayers, startLayerBatch, pauseLayerBatch, resumeLayerBatch, stopLayerBatch, undoLayerBatch, retouch, deleteTile, addRegion, addRegions, toggleCollisionCell, setCollisionCells, updateRegion, deleteRegion, undo, redo,
+    locked, pumpActive, layerPumpActive, apply, patch, updateScaleReference, loadScalePreset, importCharacter, save, load, listProjects, createNew, importBase, importStyle, importZip, extractStyle, previewPrompts, previewExpansionTemplate: (direction) => { const p = ref.current; if (!selectedTile || !direction) throw new Error('请先选择地图块和方向。'); return previewExpansionTemplate(p, assets, { x: selectedTile.x + direction.dx, y: selectedTile.y + direction.dy }); }, seed, expand, regenerateSelectedTile, accept, discard, cancel, changeOverlap,
+    matte, ground, generateLayer, importLayer, cleanObjects, editMatte, acceptLayers, acceptAllLayers, discardLayers, startLayerBatch, pauseLayerBatch, resumeLayerBatch, stopLayerBatch, undoLayerBatch, reprocessExpansion, correctSeamColors, repairSeams, retouch, deleteTile, addRegion, addRegions, toggleCollisionCell, setCollisionCells, updateRegion, deleteRegion, undo, redo,
     canUndo: historyVersion >= 0 && history.current.past.length > 0, canRedo: history.current.future.length > 0,
-    startBatch, pauseBatch, resumeBatch, stopBatch, undoBatch };
+    showQueueReview, startBatch, pauseBatch, resumeBatch, stopBatch, undoBatch };
 }

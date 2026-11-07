@@ -23,8 +23,8 @@ export function mapDiagnostics(settings, request, model) {
   let validationError = '';
   if (request.provider === 'kling') { try { assertKlingPromptLength(prompts.prompt); assertKlingPromptLength(prompts.negativePrompt, '反向提示词'); } catch (e) { validationError = e.message; } }
   const scale = request.scaleReference;
-  return { ...prompts, provider: request.provider, model, operation: request.operation, width: request.width, height: request.height, resolution: request.resolution,
-    hasImage: Boolean(request.imageBase64), hasMask: Boolean(request.maskBase64), referenceMode: request.operation === 'seed' && (request.imageBase64 || request.reference?.positive || request.reference?.negative) ? request.reference?.mode || 'style' : 'none',
+  return { ...prompts, provider: request.provider, model, operation: request.operation, width: request.width, height: request.height, resolution: request.resolution, expansionPolicy: request.expansionPolicy,
+    hasImage: Boolean(request.imageBase64), hasSeparateGuide: Boolean(request.guideImageBase64), hasContextImage:Boolean(request.contextImageBase64), hasMask: Boolean(request.maskBase64), referenceMode: request.operation === 'seed' && (request.imageBase64 || request.reference?.positive || request.reference?.negative) ? request.reference?.mode || 'style' : 'none',
     referenceInput: request.operation === 'seed' ? request.reference?.input || 'image' : 'map',
     scale: scale ? { enabled: true, widthPx: scale.widthPx, heightPx: scale.heightPx, objectCount: scale.environmentRulesEnabled ? scale.objectSizes?.entries.length || 0 : 0, frame: scale.frame } : { enabled: false },
     positiveChars: prompts.prompt.length, negativeChars: prompts.negativePrompt.length, limit: request.provider === 'kling' ? KLING_PROMPT_LIMIT : null, validationError };
